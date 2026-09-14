@@ -1,0 +1,76 @@
+controller:
+  hostname: laserpi
+
+laser:
+  tcp_port: 23
+  baud: 115200
+  mode: network
+  usb:
+    vid: null
+    pid: null
+    serial: null
+    description_contains: null
+  reconnect_timeout_seconds: 10
+  status_poll_interval_seconds: 0.25
+
+camera:
+  enabled: true
+  usb:
+    vid: null
+    pid: null
+    serial: null
+    description_contains: null
+  stream_url: null
+
+gpio:
+  power_input:
+    chip: null
+    line: null
+    active_high: true
+  estop_input:
+    chip: null
+    line: null
+    active_high: true
+  k1_output:
+    chip: null
+    line: null
+    active_high: true
+  k2_output:
+    chip: null
+    line: null
+    active_high: true
+
+fire:
+  enabled: false
+  active: false
+  drop_k2: true
+  stop_duration_ms: 1000
+  auto_reenergize: false
+  auto_home: false
+
+network:
+  private_ts1_ap:
+    enabled: true
+    hidden: true
+    ssid: TS1-LINK
+    password: CHANGE_ME
+    address: 10.42.0.1/24
+  uplink_wifi:
+    enabled: true
+    interface_hint: null
+  ethernet_preferred: true
+
+websocket:
+  host: 10.42.0.1
+  port: 8765
+  path: /ws
+  shared_token: CHANGE_ME
+
+web:
+  host: 0.0.0.0
+  port: 8080
+
+logging:
+  level: INFO
+  json_file: /var/log/ts1-controller/events.jsonl
+

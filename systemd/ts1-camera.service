@@ -1,0 +1,16 @@
+[Unit]
+Description=TS1 Camera Streamer
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ts1-controller
+Group=ts1-controller
+ExecStart=/usr/bin/env sh -c 'echo camera streamer command not configured; sleep infinity'
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+

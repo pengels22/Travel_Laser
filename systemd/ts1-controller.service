@@ -1,0 +1,20 @@
+[Unit]
+Description=TS1 Laser Controller
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ts1-controller
+Group=ts1-controller
+WorkingDirectory=/opt/ts1-laser-controller
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/opt/ts1-laser-controller/.venv/bin/ts1-controller --config /etc/ts1-controller/controller.yaml
+Restart=on-failure
+RestartSec=3
+StateDirectory=ts1-controller
+LogsDirectory=ts1-controller
+
+[Install]
+WantedBy=multi-user.target
+
