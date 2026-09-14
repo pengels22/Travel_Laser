@@ -26,18 +26,22 @@ gpio:
   power_input:
     chip: null
     line: null
+    board_pin: PC14
     active_high: true
   estop_input:
     chip: null
     line: null
+    board_pin: PC15
     active_high: true
   k1_output:
     chip: null
     line: null
+    board_pin: PC5
     active_high: true
   k2_output:
     chip: null
     line: null
+    board_pin: PC8
     active_high: true
 
 fire:
@@ -73,4 +77,3 @@ web:
 logging:
   level: INFO
   json_file: /var/log/ts1-controller/events.jsonl
-
