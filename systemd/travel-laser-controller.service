@@ -1,0 +1,21 @@
+[Unit]
+Description=Travel Laser Controller
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=travel-laser
+Group=travel-laser
+WorkingDirectory=/opt/travel-laser-controller
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/opt/travel-laser-controller/.venv/bin/travel-laser-controller --config /etc/travel-laser/controller.yaml
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+Restart=on-failure
+RestartSec=3
+StateDirectory=travel-laser
+LogsDirectory=travel-laser
+
+[Install]
+WantedBy=multi-user.target

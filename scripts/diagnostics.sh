@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "== ts1-controller service =="
-systemctl status --no-pager ts1-controller.service || true
+echo "== travel-laser-controller service =="
+systemctl status --no-pager travel-laser-controller.service || true
 
 echo "== recent journal =="
-journalctl -u ts1-controller.service -n 80 --no-pager || true
+journalctl -u travel-laser-controller.service -n 80 --no-pager || true
 
 echo "== ip addresses =="
 ip addr || ifconfig || true
@@ -27,4 +27,4 @@ for dev in /dev/video*; do
 done
 
 echo "== mode =="
-cat /var/lib/ts1-controller/mode.json 2>/dev/null || true
+cat /var/lib/travel-laser/mode.json 2>/dev/null || true

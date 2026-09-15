@@ -12,13 +12,14 @@ The install script runs `hostnamectl set-hostname Travel-Laser`.
 Core packages installed by `scripts/install.sh`:
 
 ```bash
-apt-get install -y curl ffmpeg git gpiod jq libgpiod-dev network-manager python3-dev python3-libgpiod python3-pip python3-venv rsync v4l-utils
+apt-get install -y curl ffmpeg git gpiod i2c-tools jq libgpiod-dev network-manager python3-dev python3-libgpiod python3-pip python3-smbus python3-venv rsync v4l-utils
 ```
 
 Service units installed:
 
-- `ts1-controller.service`
+- `travel-laser-controller.service`
 - `mediamtx.service`
-- `ts1-camera.service`
+- `travel-laser-camera.service`
+- `travel-laser-ui.service`
 
-The controller service runs as `ts1-controller` and uses `CAP_NET_BIND_SERVICE` so it can bind GRBL TCP port `23` without running as root.
+The controller service runs as `travel-laser` and uses `CAP_NET_BIND_SERVICE` so it can bind GRBL TCP port `23` without running as root.

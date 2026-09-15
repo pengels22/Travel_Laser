@@ -21,9 +21,9 @@ async def test_physical_estop_causes_k1_off():
     assert snapshot.physical.k1 is False
 
 
-async def test_ts1_estop_causes_k1_off():
+async def test_local_ui_estop_causes_k1_off():
     state, _, safety = await _safety()
-    await safety.request_estop(EstopSource.TS1)
+    await safety.request_estop(EstopSource.LOCAL_UI)
     snapshot = await state.snapshot()
     assert snapshot.physical.k1 is False
     assert snapshot.machine.homed is False
@@ -147,10 +147,3 @@ async def test_camera_disconnect_does_not_affect_relays():
     after = await state.snapshot()
     assert after.physical.k1 == before.physical.k1
 
-
-async def test_ts1_disconnect_does_not_affect_relays():
-    state, _, safety = await _safety()
-    before = await state.snapshot()
-    await safety.handle_ts1_disconnected()
-    after = await state.snapshot()
-    assert after.physical.k1 == before.physical.k1

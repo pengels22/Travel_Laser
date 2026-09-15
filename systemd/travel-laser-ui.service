@@ -1,0 +1,17 @@
+[Unit]
+Description=Travel Laser Local Touchscreen UI
+After=travel-laser-controller.service
+Wants=travel-laser-controller.service
+
+[Service]
+Type=simple
+User=travel-laser
+Group=travel-laser
+WorkingDirectory=/opt/travel-laser-controller
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/opt/travel-laser-controller/.venv/bin/travel-laser-ui --config /etc/travel-laser/controller.yaml --display st7796 --touch ft6336
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

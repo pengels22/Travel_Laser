@@ -70,13 +70,13 @@ class LinuxGPIOBackend:
 
     def _request_input(self, gpiod, name: str, line_config: GPIOLineConfig) -> None:
         line = self._get_line(line_config)
-        line.request(consumer="ts1-controller", type=gpiod.LINE_REQ_DIR_IN)
+        line.request(consumer="travel-laser-controller", type=gpiod.LINE_REQ_DIR_IN)
         self._lines[name] = line
 
     def _request_output(self, gpiod, name: str, line_config: GPIOLineConfig, energized: bool) -> None:
         line = self._get_line(line_config)
         physical = self._physical_value(line_config, energized)
-        line.request(consumer="ts1-controller", type=gpiod.LINE_REQ_DIR_OUT, default_vals=[physical])
+        line.request(consumer="travel-laser-controller", type=gpiod.LINE_REQ_DIR_OUT, default_vals=[physical])
         self._lines[name] = line
 
     def _get_line(self, line_config: GPIOLineConfig):

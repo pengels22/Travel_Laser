@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-APP_DIR="/opt/ts1-laser-controller"
-CONFIG_DIR="/etc/ts1-controller"
-STATE_DIR="/var/lib/ts1-controller"
-LOG_DIR="/var/log/ts1-controller"
-SERVICE_USER="ts1-controller"
+APP_DIR="/opt/travel-laser-controller"
+CONFIG_DIR="/etc/travel-laser"
+STATE_DIR="/var/lib/travel-laser"
+LOG_DIR="/var/log/travel-laser"
+SERVICE_USER="travel-laser"
 SOURCE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 if [[ "${EUID}" -ne 0 ]]; then
@@ -24,10 +24,12 @@ apt-get install -y \
   git \
   gpiod \
   jq \
+  i2c-tools \
   libgpiod-dev \
   network-manager \
   python3-dev \
   python3-libgpiod \
+  python3-smbus \
   python3-pip \
   python3-venv \
   rsync \
@@ -59,12 +61,14 @@ python3 -m venv .venv
 
 scripts/install-mediamtx.sh
 
-cp systemd/ts1-controller.service /etc/systemd/system/ts1-controller.service
-cp systemd/ts1-camera.service /etc/systemd/system/ts1-camera.service
+cp systemd/travel-laser-controller.service /etc/systemd/system/travel-laser-controller.service
+cp systemd/travel-laser-camera.service /etc/systemd/system/travel-laser-camera.service
 cp systemd/mediamtx.service /etc/systemd/system/mediamtx.service
+cp systemd/travel-laser-ui.service /etc/systemd/system/travel-laser-ui.service
 systemctl daemon-reload
-systemctl enable ts1-controller.service
+systemctl enable travel-laser-controller.service
 systemctl enable mediamtx.service
-systemctl enable ts1-camera.service
+systemctl enable travel-laser-camera.service
+systemctl enable travel-laser-ui.service
 
 echo "Install complete. Review ${CONFIG_DIR}/controller.yaml before starting the service."

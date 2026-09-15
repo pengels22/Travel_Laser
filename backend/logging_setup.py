@@ -16,7 +16,7 @@ def configure_logging(level: str = "INFO") -> None:
 
 class EventLogger:
     def __init__(self, path: str | None = None) -> None:
-        self.logger = logging.getLogger("ts1.events")
+        self.logger = logging.getLogger("travel_laser.events")
         self.path = Path(path) if path else None
         if self.path:
             self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -27,4 +27,3 @@ class EventLogger:
         if self.path:
             with self.path.open("a", encoding="utf-8") as handle:
                 handle.write(json.dumps(data, sort_keys=True) + "\n")
-

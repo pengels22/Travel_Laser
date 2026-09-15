@@ -1,17 +1,17 @@
 [Unit]
-Description=TS1 Camera Streamer
+Description=Travel Laser Camera Streamer
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
-User=ts1-controller
-Group=ts1-controller
-WorkingDirectory=/opt/ts1-laser-controller
-Environment=CAMERA_DEVICE=/dev/video0
+User=travel-laser
+Group=travel-laser
+WorkingDirectory=/opt/travel-laser-controller
+Environment=CAMERA_DEVICE=
 Environment=CAMERA_RESOLUTION=highest_available
 Environment=CAMERA_FPS=30
-ExecStart=/opt/ts1-laser-controller/scripts/start-camera-webrtc.sh
+ExecStart=/opt/travel-laser-controller/scripts/start-camera-webrtc.sh
 Restart=on-failure
 RestartSec=3
 

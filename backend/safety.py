@@ -9,8 +9,8 @@ from .state import ControllerState, MachineState
 
 class EstopSource(str, Enum):
     PHYSICAL = "physical"
-    TS1 = "ts1"
     WEB = "web"
+    LOCAL_UI = "local_ui"
     SOFTWARE = "software"
     FIRE = "fire"
     LIGHTBURN = "lightburn"
@@ -62,8 +62,8 @@ class SafetyController:
 
         event_code = {
             EstopSource.PHYSICAL: EventCode.PHYSICAL_ESTOP_ON,
-            EstopSource.TS1: EventCode.TS1_ESTOP,
             EstopSource.WEB: EventCode.WEB_ESTOP,
+            EstopSource.LOCAL_UI: EventCode.LOCAL_UI_ESTOP,
             EstopSource.SOFTWARE: EventCode.SOFTWARE_ESTOP,
             EstopSource.LIGHTBURN: EventCode.LIGHTBURN_STREAM_LOST,
             EstopSource.USB: EventCode.LASER_USB_DISCONNECTED,
@@ -75,7 +75,7 @@ class SafetyController:
         def mutate(snapshot):
             if source == EstopSource.PHYSICAL:
                 snapshot.physical.estop_switch = True
-            elif source == EstopSource.TS1:
+            elif source == EstopSource.LOCAL_UI:
                 snapshot.safety.remote_estop = True
             elif source in {EstopSource.WEB, EstopSource.SOFTWARE, EstopSource.LIGHTBURN, EstopSource.USB}:
                 snapshot.safety.software_estop = True
@@ -144,13 +144,6 @@ class SafetyController:
 
         await self.state.update(mutate)
         self.record(EventCode.CAMERA_USB_DISCONNECTED, Severity.WARNING, "camera")
-
-    async def handle_ts1_disconnected(self) -> None:
-        def mutate(state):
-            state.ts1.connected = False
-
-        await self.state.update(mutate)
-        self.record(EventCode.TS1_DISCONNECTED, Severity.WARNING, "websocket")
 
     def record(
         self,

@@ -27,6 +27,7 @@ out/
 .next/
 .nuxt/
 coverage/
+.state/
 
 # Logs
 *.log

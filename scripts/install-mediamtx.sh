@@ -24,7 +24,7 @@ fi
 curl -fL "${URL}" -o "${TMP_DIR}/mediamtx.tar.gz"
 tar -xzf "${TMP_DIR}/mediamtx.tar.gz" -C "${TMP_DIR}"
 install -m 0755 "${TMP_DIR}/mediamtx" /usr/local/bin/mediamtx
-install -m 0644 config/mediamtx.example.yml /etc/ts1-controller/mediamtx.yml
+install -d /etc/travel-laser
+install -m 0644 config/mediamtx.example.yml /etc/travel-laser/mediamtx.yml
 
 echo "Installed MediaMTX from ${URL}"
-

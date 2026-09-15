@@ -27,6 +27,32 @@ camera:
     description_contains: null
   stream_url: null
 
+display:
+  controller: ST7796U
+  width: 480
+  height: 320
+  rotation: 90
+  # TODO: confirm Orange Pi SPI device after enabling SPI.
+  spi_device: null
+  spi_speed_hz: 24000000
+  # TODO: choose and wire 3.3 V GPIO lines for D/C, RESET, and optional backlight.
+  dc_gpio_chip: gpiochip0
+  dc_gpio_line: null
+  reset_gpio_chip: gpiochip0
+  reset_gpio_line: null
+  backlight_gpio_chip: gpiochip0
+  backlight_gpio_line: null
+
+touch:
+  controller: FT6336U
+  # TODO: confirm Orange Pi I2C bus after enabling I2C.
+  i2c_bus: null
+  i2c_address: 0x38
+  rotation: 90
+  # TODO: wire interrupt GPIO only if needed; polling fallback is supported.
+  interrupt_gpio_chip: gpiochip0
+  interrupt_gpio_line: null
+
 gpio:
   power_input:
     # PC14 high means the physical laser power switch is on.
@@ -68,16 +94,7 @@ virtualhere:
   backend_controls_service: false
 
 network:
-  private_ts1_ap:
-    enabled: true
-    always_enabled: true
-    interface: wlan0
-    hidden: true
-    ssid: TS1PE
-    password: AsDfGhJkL13579!
-    address: 10.42.0.1/24
   uplink_wifi:
-    # Configurable from TS1 Settings menus. Must not modify wlan0/TS1PE.
     enabled: true
     interface: wlan1
     metric: 300
@@ -86,16 +103,10 @@ network:
     metric: 100
   ethernet_preferred: true
 
-websocket:
-  host: 10.42.0.1
-  port: 8765
-  path: /ws
-  shared_token: CHANGE_ME
-
 web:
   host: 0.0.0.0
   port: 8080
 
 logging:
   level: INFO
-  json_file: /var/log/ts1-controller/events.jsonl
+  json_file: /var/log/travel-laser/events.jsonl

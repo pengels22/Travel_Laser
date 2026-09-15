@@ -35,6 +35,32 @@ class CameraConfig:
 
 
 @dataclass
+class DisplayHardwareConfig:
+    controller: str = "ST7796U"
+    width: int = 480
+    height: int = 320
+    rotation: int = 90
+    spi_device: str | None = None
+    spi_speed_hz: int = 24_000_000
+    dc_gpio_chip: str | None = None
+    dc_gpio_line: int | None = None
+    reset_gpio_chip: str | None = None
+    reset_gpio_line: int | None = None
+    backlight_gpio_chip: str | None = None
+    backlight_gpio_line: int | None = None
+
+
+@dataclass
+class TouchHardwareConfig:
+    controller: str = "FT6336U"
+    i2c_bus: int | None = None
+    i2c_address: int = 0x38
+    interrupt_gpio_chip: str | None = None
+    interrupt_gpio_line: int | None = None
+    rotation: int = 90
+
+
+@dataclass
 class GPIOLineConfig:
     chip: str | None = None
     line: int | None = None
@@ -48,14 +74,6 @@ class GPIOConfig:
     power_input: GPIOLineConfig = field(default_factory=GPIOLineConfig)
     estop_input: GPIOLineConfig = field(default_factory=GPIOLineConfig)
     k1_output: GPIOLineConfig = field(default_factory=GPIOLineConfig)
-
-
-@dataclass
-class WebSocketConfig:
-    host: str = "10.42.0.1"
-    port: int = 8765
-    path: str = "/ws"
-    shared_token: str = "CHANGE_ME"
 
 
 @dataclass
@@ -89,11 +107,6 @@ class LoggingConfig:
 
 @dataclass
 class NetworkConfig:
-    ts1_ap_interface: str = "wlan0"
-    ts1_ap_hidden: bool = True
-    ts1_ap_ssid: str = "TS1PE"
-    ts1_ap_password: str = "AsDfGhJkL13579!"
-    ts1_ap_always_enabled: bool = True
     uplink_wifi_interface: str = "wlan1"
     ethernet_interface: str = "eth0"
     ethernet_metric: int = 100
@@ -111,8 +124,9 @@ class AppConfig:
     controller: ControllerConfig = field(default_factory=ControllerConfig)
     laser: LaserConfig = field(default_factory=LaserConfig)
     camera: CameraConfig = field(default_factory=CameraConfig)
+    display: DisplayHardwareConfig = field(default_factory=DisplayHardwareConfig)
+    touch: TouchHardwareConfig = field(default_factory=TouchHardwareConfig)
     gpio: GPIOConfig = field(default_factory=GPIOConfig)
-    websocket: WebSocketConfig = field(default_factory=WebSocketConfig)
     web: WebConfig = field(default_factory=WebConfig)
     fire: FireConfig = field(default_factory=FireConfig)
     virtualhere: VirtualHereConfig = field(default_factory=VirtualHereConfig)
@@ -133,13 +147,13 @@ def load_config(path: Path | None = None) -> AppConfig:
 def config_from_dict(raw: dict[str, Any]) -> AppConfig:
     laser = raw.get("laser", {})
     camera = raw.get("camera", {})
+    display = raw.get("display", {})
+    touch = raw.get("touch", {})
     gpio = raw.get("gpio", {})
-    websocket = raw.get("websocket", {})
     web = raw.get("web", {})
     fire = raw.get("fire", {})
     virtualhere = raw.get("virtualhere", {})
     network = raw.get("network", {})
-    private_ts1_ap = network.get("private_ts1_ap", {})
     logging = raw.get("logging", {})
     controller = raw.get("controller", {})
 
@@ -160,16 +174,32 @@ def config_from_dict(raw: dict[str, Any]) -> AppConfig:
             stream_type=str(camera.get("stream_type", "webrtc")),
             resolution=str(camera.get("resolution", "highest_available")),
         ),
+        display=DisplayHardwareConfig(
+            controller=str(display.get("controller", "ST7796U")),
+            width=int(display.get("width", 480)),
+            height=int(display.get("height", 320)),
+            rotation=int(display.get("rotation", 90)),
+            spi_device=display.get("spi_device"),
+            spi_speed_hz=int(display.get("spi_speed_hz", 24_000_000)),
+            dc_gpio_chip=display.get("dc_gpio_chip"),
+            dc_gpio_line=_optional_int(display.get("dc_gpio_line")),
+            reset_gpio_chip=display.get("reset_gpio_chip"),
+            reset_gpio_line=_optional_int(display.get("reset_gpio_line")),
+            backlight_gpio_chip=display.get("backlight_gpio_chip"),
+            backlight_gpio_line=_optional_int(display.get("backlight_gpio_line")),
+        ),
+        touch=TouchHardwareConfig(
+            controller=str(touch.get("controller", "FT6336U")),
+            i2c_bus=_optional_int(touch.get("i2c_bus")),
+            i2c_address=int(str(touch.get("i2c_address", "0x38")), 0),
+            interrupt_gpio_chip=touch.get("interrupt_gpio_chip"),
+            interrupt_gpio_line=_optional_int(touch.get("interrupt_gpio_line")),
+            rotation=int(touch.get("rotation", display.get("rotation", 90))),
+        ),
         gpio=GPIOConfig(
             power_input=_gpio_line(gpio.get("power_input", {})),
             estop_input=_gpio_line(gpio.get("estop_input", {})),
             k1_output=_gpio_line(gpio.get("k1_output", {})),
-        ),
-        websocket=WebSocketConfig(
-            host=str(websocket.get("host", "10.42.0.1")),
-            port=int(websocket.get("port", 8765)),
-            path=str(websocket.get("path", "/ws")),
-            shared_token=str(websocket.get("shared_token", "CHANGE_ME")),
         ),
         web=WebConfig(host=str(web.get("host", "0.0.0.0")), port=int(web.get("port", 8080))),
         fire=FireConfig(
@@ -186,11 +216,6 @@ def config_from_dict(raw: dict[str, Any]) -> AppConfig:
             backend_controls_service=_as_bool(virtualhere.get("backend_controls_service", False)),
         ),
         network=NetworkConfig(
-            ts1_ap_interface=str(private_ts1_ap.get("interface", "wlan0")),
-            ts1_ap_hidden=_as_bool(private_ts1_ap.get("hidden", True)),
-            ts1_ap_ssid=str(private_ts1_ap.get("ssid", "TS1PE")),
-            ts1_ap_password=str(private_ts1_ap.get("password", "AsDfGhJkL13579!")),
-            ts1_ap_always_enabled=_as_bool(private_ts1_ap.get("always_enabled", True)),
             uplink_wifi_interface=str(network.get("uplink_wifi", {}).get("interface", "wlan1")),
             ethernet_interface=str(network.get("ethernet", {}).get("interface", "eth0")),
             ethernet_metric=int(network.get("ethernet", {}).get("metric", 100)),
@@ -219,6 +244,12 @@ def _gpio_line(raw: dict[str, Any]) -> GPIOLineConfig:
         active_high=_as_bool(raw.get("active_high", True)),
         bias=str(raw.get("bias", "none")),
     )
+
+
+def _optional_int(value: Any) -> int | None:
+    if value is None:
+        return None
+    return int(str(value), 0)
 
 
 def _as_bool(value: Any) -> bool:

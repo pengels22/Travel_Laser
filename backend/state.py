@@ -54,12 +54,6 @@ class LightBurnState:
 
 
 @dataclass
-class TS1State:
-    connected: bool = False
-    last_seen: str | None = None
-
-
-@dataclass
 class CameraState:
     connected: bool = False
     stream_url: str | None = None
@@ -93,7 +87,6 @@ class ControllerSnapshot:
     physical: PhysicalState = field(default_factory=PhysicalState)
     machine: MachineRuntimeState = field(default_factory=MachineRuntimeState)
     lightburn: LightBurnState = field(default_factory=LightBurnState)
-    ts1: TS1State = field(default_factory=TS1State)
     camera: CameraState = field(default_factory=CameraState)
     network: NetworkState = field(default_factory=NetworkState)
     safety: SafetyState = field(default_factory=SafetyState)
@@ -136,7 +129,6 @@ class ControllerState:
                 }
             ),
             lightburn=LightBurnState(**data["lightburn"]),
-            ts1=TS1State(**data["ts1"]),
             camera=CameraState(**data["camera"]),
             network=NetworkState(**data["network"]),
             safety=SafetyState(**data["safety"]),

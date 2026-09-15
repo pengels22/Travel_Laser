@@ -5,7 +5,7 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/mediamtx /etc/ts1-controller/mediamtx.yml
+ExecStart=/usr/local/bin/mediamtx /etc/travel-laser/mediamtx.yml
 Restart=on-failure
 RestartSec=3
 

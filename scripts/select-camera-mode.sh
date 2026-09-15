@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-DEVICE="${1:-/dev/video0}"
+DEVICE="${1:-}"
+
+if [[ -z "${DEVICE}" ]]; then
+  echo "Usage: $0 /dev/v4l/by-id/<camera>" >&2
+  exit 1
+fi
 
 v4l2-ctl --device="${DEVICE}" --list-formats-ext |
   awk '
@@ -24,4 +29,3 @@ v4l2-ctl --device="${DEVICE}" --list-formats-ext |
       }
       printf "%sx%s\n", best_width, best_height
     }'
-

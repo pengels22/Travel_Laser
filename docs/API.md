@@ -1,39 +1,23 @@
 # API
 
-## WebSocket
-
-Default endpoint: `ws://10.42.0.1:8765/ws`
-
-Handshake from TS1:
-
-```json
-{"type":"hello","device":"ts1","protocol":1,"token":"CHANGE_ME"}
-```
-
-Supported packet groups:
-
-- `hello`
-- `status`
-- `stop`
-- `command`
-- `settings`
-
-Every command, stop, or settings request returns an `ack` with `ok` and optional `reason`.
-
-TS1 settings Wi-Fi actions:
-
-- `wifi_scan`
-- `wifi_connect`
-- `wifi_forget`
-
-These actions apply only to uplink Wi-Fi on `wlan1`. They must not change or disable the hidden `wlan0` TS1 network.
-
 ## Web Portal
 
 - `GET /api/status`
 - `POST /api/stop`
 - `POST /api/estop`
 
-The web portal intentionally excludes jog, home, Wi-Fi settings, and mode switching.
-
 The web portal is hosted on `0.0.0.0:8080` and embeds the configured WebRTC camera stream in a simple viewer. If no camera stream URL is configured, it defaults to `http://<current-host>:8889/cam`.
+
+## Local UI
+
+The local touchscreen UI is rendered directly on the Orange Pi. The current first-pass executable is:
+
+```bash
+travel-laser-ui --config /etc/travel-laser/controller.yaml --display st7796 --touch ft6336
+```
+
+Expected screens are Home/Status, Files/Jobs, Jog/Position, Laser Controls, Network, Settings, and System/Diagnostics. The first implementation pass includes the display/touch abstraction and a minimal home/status surface; the full screen flows are still TODO.
+
+## Network Settings
+
+Network settings apply to uplink Wi-Fi on `wlan1`. Ethernet `eth0` remains preferred when both uplinks are connected.

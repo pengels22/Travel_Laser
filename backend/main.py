@@ -10,12 +10,10 @@ from .gpio import LinuxGPIOBackend, MockGPIOBackend
 from .grbl_proxy import GrblProxy
 from .logging_setup import EventLogger, configure_logging
 from .mode_manager import ModeManager
-from .network_manager import NetworkManager
 from .safety import SafetyController
 from .state import ControllerState, LaserMode
 from .virtualhere import VirtualHereService
 from .web_portal import WebPortal
-from .websocket_api import WebSocketAPI
 
 LOGGER = logging.getLogger(__name__)
 
@@ -47,20 +45,9 @@ async def run(config_path: Path | None, mock: bool) -> None:
         dry_run=mock,
         backend_controls_service=config.virtualhere.backend_controls_service,
     )
-    state_dir = Path(".state") if mock else Path("/var/lib/ts1-controller")
+    state_dir = Path(".state") if mock else Path("/var/lib/travel-laser")
     mode_manager = ModeManager(state, proxy, virtualhere, state_dir / "mode.json")
-    network_manager = NetworkManager(config.network.uplink_wifi_interface, dry_run=mock)
     restored_mode = await mode_manager.restore(LaserMode(config.laser.mode))
-    ws_api = WebSocketAPI(
-        state,
-        safety,
-        proxy,
-        mode_manager,
-        network_manager,
-        host=config.websocket.host,
-        port=config.websocket.port,
-        token=config.websocket.shared_token,
-    )
     portal = WebPortal(
         state,
         safety,
@@ -71,7 +58,6 @@ async def run(config_path: Path | None, mock: bool) -> None:
     )
 
     await safety.refresh_physical_inputs()
-    await ws_api.start()
     await portal.start()
     if restored_mode == LaserMode.NETWORK:
         await proxy.start()
@@ -84,20 +70,19 @@ async def run(config_path: Path | None, mock: bool) -> None:
     await state.update(ready)
     for event in safety.events:
         event_logger.emit(event)
-    LOGGER.info("TS1 controller ready in %s mode", restored_mode.value)
+    LOGGER.info("Travel Laser controller ready in %s mode", restored_mode.value)
 
     stop_event = asyncio.Event()
     try:
         await stop_event.wait()
     finally:
         await portal.stop()
-        await ws_api.stop()
         await proxy.stop()
         await virtualhere.stop()
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="TS1 laser controller backend")
+    parser = argparse.ArgumentParser(description="Travel Laser controller backend")
     parser.add_argument("--config", type=Path, default=None)
     parser.add_argument("--mock", action="store_true", help="use mock GPIO/serial hardware")
     args = parser.parse_args()
