@@ -1,0 +1,7 @@
+webrtc: yes
+webrtcAddress: :8889
+rtspAddress: :8554
+
+paths:
+  cam:
+    source: publisher

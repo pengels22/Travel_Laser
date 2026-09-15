@@ -26,27 +26,24 @@ function renderStatus(state) {
 
 function renderCamera(camera) {
   const frame = document.getElementById("camera-frame");
-  if (!camera.stream_url) {
-    frame.innerHTML = '<span id="camera-placeholder">No WebRTC stream configured</span>';
-    return;
-  }
+  const streamUrl = camera.stream_url || `${window.location.protocol}//${window.location.hostname}:8889/cam`;
 
   if (camera.stream_type === "webrtc") {
     const existing = frame.querySelector("iframe");
-    if (existing && existing.src === camera.stream_url) return;
+    if (existing && existing.src === streamUrl) return;
     frame.innerHTML = "";
     const iframe = document.createElement("iframe");
-    iframe.src = camera.stream_url;
+    iframe.src = streamUrl;
     iframe.title = "WebRTC camera stream";
     iframe.allow = "autoplay; fullscreen; camera";
     iframe.referrerPolicy = "no-referrer";
     frame.appendChild(iframe);
   } else {
     const existing = frame.querySelector("img");
-    if (existing && existing.src === camera.stream_url) return;
+    if (existing && existing.src === streamUrl) return;
     frame.innerHTML = "";
     const img = document.createElement("img");
-    img.src = camera.stream_url;
+    img.src = streamUrl;
     img.alt = "Camera stream";
     frame.appendChild(img);
   }

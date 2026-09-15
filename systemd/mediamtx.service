@@ -1,0 +1,13 @@
+[Unit]
+Description=MediaMTX WebRTC Gateway
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/mediamtx /etc/ts1-controller/mediamtx.yml
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

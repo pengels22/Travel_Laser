@@ -1,4 +1,4 @@
-# TS1 ESP32 Firmware Placeholder
+# TS1 ESP32 Firmware Scaffold
 
 This is a minimal PlatformIO scaffold for the future TS1 HMI firmware.
 

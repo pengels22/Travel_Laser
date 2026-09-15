@@ -25,7 +25,7 @@ async def run(config_path: Path | None, mock: bool) -> None:
     configure_logging(config.logging.level)
     event_logger = EventLogger(config.logging.json_file)
     state = ControllerState()
-    gpio = MockGPIOBackend() if mock else LinuxGPIOBackend()
+    gpio = MockGPIOBackend() if mock else LinuxGPIOBackend(config.gpio)
     safety = SafetyController(state, gpio)
     await safety.initialize_safe()
 
@@ -42,10 +42,14 @@ async def run(config_path: Path | None, mock: bool) -> None:
         port=config.laser.tcp_port,
         status_poll_interval=config.laser.status_poll_interval_seconds,
     )
-    virtualhere = VirtualHereService()
+    virtualhere = VirtualHereService(
+        service_name=config.virtualhere.service_name,
+        dry_run=mock,
+        backend_controls_service=config.virtualhere.backend_controls_service,
+    )
     state_dir = Path(".state") if mock else Path("/var/lib/ts1-controller")
     mode_manager = ModeManager(state, proxy, virtualhere, state_dir / "mode.json")
-    network_manager = NetworkManager(config.network.uplink_wifi_interface)
+    network_manager = NetworkManager(config.network.uplink_wifi_interface, dry_run=mock)
     restored_mode = await mode_manager.restore(LaserMode(config.laser.mode))
     ws_api = WebSocketAPI(
         state,

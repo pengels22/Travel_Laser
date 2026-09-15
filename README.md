@@ -24,7 +24,7 @@ Implemented:
 
 - Asyncio Python backend package.
 - Central asyncio-safe controller state.
-- Mock GPIO backend and Linux GPIO placeholder.
+- Mock GPIO backend and config-driven Linux GPIO backend.
 - Safety controller for K1/K2 behavior.
 - Mockable GRBL TCP proxy with realtime command injection.
 - Network vs VirtualHere mode manager with persistent mode file.
@@ -33,6 +33,8 @@ Implemented:
 - USB identity abstractions.
 - Structured event logging support.
 - Example config, docs, scripts, systemd units, and tests.
+- NetworkManager-backed `wlan1` Wi-Fi scan/connect/forget actions.
+- MediaMTX/FFmpeg WebRTC camera service integration.
 
 ## Development
 
@@ -59,11 +61,27 @@ Note: GRBL network mode is fixed to TCP port `23`. On macOS and many Linux syste
 - No job auto-resume is implemented after E-stop, reboot, power failure, controller reset, or unexpected laser USB loss.
 - Camera loss and TS1 disconnect alone are non-fatal.
 
-## Hardware TODOs
+## Remaining Hardware-Dependent Items
 
-- Confirm Orange Pi GPIO chip/line mapping.
 - Identify laser USB VID/PID/serial.
 - Identify camera USB VID/PID/serial.
-- Confirm VirtualHere installation/service behavior.
-- Confirm WebRTC camera streamer command and service.
-- Confirm TS1 display, touch, and ESP32 pinout before firmware UI work.
+- Replace `CAMERA_DEVICE=/dev/video0` in `systemd/ts1-camera.service` with a stable `/dev/v4l/by-id/...` path after the camera is present.
+- Confirm the highest stable camera mode reported by `v4l2-ctl --list-formats-ext`; the service currently selects the largest advertised resolution and starts at 30 FPS.
+- Confirm the exact VirtualHere service name and whether backend-controlled mode switching should start/stop that service or leave it manual.
+- Set final WebSocket shared token, currently `CHANGE_ME`.
+- Confirm Tailscale device name/IP after first login.
+- TS1 firmware remains a placeholder scaffold until display, touch, and ESP32 pinout are confirmed.
+
+## Install Notes
+
+The Orange Pi install path uses Debian/Armbian package tooling for Python, NetworkManager, libgpiod, FFmpeg, and V4L2 utilities. MediaMTX is installed from the latest Linux ARM release via GitHub.
+
+Useful deployment commands:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y curl ffmpeg git gpiod jq libgpiod-dev network-manager python3-dev python3-libgpiod python3-pip python3-venv rsync v4l-utils
+sudo scripts/install.sh
+sudo scripts/configure-network.sh
+sudo systemctl start mediamtx.service ts1-camera.service ts1-controller.service
+```

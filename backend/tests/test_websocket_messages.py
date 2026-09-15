@@ -19,7 +19,7 @@ async def test_ts1_hello_and_estop_ack(tmp_path: Path):
     proxy = GrblProxy(state, safety, host="127.0.0.1", port=0, status_poll_interval=60)
     virtualhere = VirtualHereService()
     mode_manager = ModeManager(state, proxy, virtualhere, tmp_path / "mode.json")
-    network_manager = NetworkManager("wlan1")
+    network_manager = NetworkManager("wlan1", dry_run=True)
     api = WebSocketAPI(state, safety, proxy, mode_manager, network_manager, "127.0.0.1", 0, "secret")
 
     hello = await api.handle_packet({"type": "hello", "device": "ts1", "protocol": 1, "token": "secret"})
@@ -38,7 +38,7 @@ async def test_ts1_wifi_settings_apply_to_wlan1(tmp_path: Path):
     proxy = GrblProxy(state, safety, host="127.0.0.1", port=0, status_poll_interval=60)
     virtualhere = VirtualHereService()
     mode_manager = ModeManager(state, proxy, virtualhere, tmp_path / "mode.json")
-    network_manager = NetworkManager("wlan1")
+    network_manager = NetworkManager("wlan1", dry_run=True)
     api = WebSocketAPI(state, safety, proxy, mode_manager, network_manager, "127.0.0.1", 0, "secret")
 
     scan = await api.handle_packet({"type": "settings", "id": 1, "action": "wifi_scan"})

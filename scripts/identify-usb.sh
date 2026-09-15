@@ -8,6 +8,7 @@ echo "== serial devices =="
 ls -l /dev/serial/by-id 2>/dev/null || true
 
 echo "== video devices =="
+v4l2-ctl --list-devices || true
 ls -l /dev/video* 2>/dev/null || true
 
 echo "== udev properties: ttyUSB/ttyACM =="
@@ -23,4 +24,3 @@ for dev in /dev/video*; do
   echo "-- ${dev}"
   udevadm info --query=property --name="${dev}" || true
 done
-

@@ -15,3 +15,5 @@ The intended deployment has a dedicated private TS1 AP and a separate uplink pat
 - Remote browser access is expected through Tailscale.
 
 Do not change or disable `wlan0` when configuring uplink Wi-Fi from TS1 menus.
+
+`scripts/configure-network.sh` creates the hidden `wlan0` TS1 network with `nmcli` and applies route metrics for `eth0` and `wlan1`.

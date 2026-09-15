@@ -36,4 +36,4 @@ These actions apply only to uplink Wi-Fi on `wlan1`. They must not change or dis
 
 The web portal intentionally excludes jog, home, Wi-Fi settings, and mode switching.
 
-The web portal is hosted on `0.0.0.0:8080` and embeds the configured WebRTC camera stream in a simple viewer.
+The web portal is hosted on `0.0.0.0:8080` and embeds the configured WebRTC camera stream in a simple viewer. If no camera stream URL is configured, it defaults to `http://<current-host>:8889/cam`.

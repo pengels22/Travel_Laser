@@ -68,6 +68,11 @@ fire:
   auto_reenergize: false
   auto_home: false
 
+virtualhere:
+  service_name: virtualhere
+  # VirtualHere is installed on the Orange Pi but configured separately by default.
+  backend_controls_service: false
+
 network:
   private_ts1_ap:
     enabled: true

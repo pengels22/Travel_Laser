@@ -10,6 +10,8 @@ Group=ts1-controller
 WorkingDirectory=/opt/ts1-laser-controller
 Environment=PYTHONUNBUFFERED=1
 ExecStart=/opt/ts1-laser-controller/.venv/bin/ts1-controller --config /etc/ts1-controller/controller.yaml
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
 Restart=on-failure
 RestartSec=3
 StateDirectory=ts1-controller
@@ -17,4 +19,3 @@ LogsDirectory=ts1-controller
 
 [Install]
 WantedBy=multi-user.target
-

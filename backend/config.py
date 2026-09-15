@@ -35,6 +35,23 @@ class CameraConfig:
 
 
 @dataclass
+class GPIOLineConfig:
+    chip: str | None = None
+    line: int | None = None
+    board_pin: str | None = None
+    active_high: bool = True
+    bias: str = "none"
+
+
+@dataclass
+class GPIOConfig:
+    power_input: GPIOLineConfig = field(default_factory=GPIOLineConfig)
+    estop_input: GPIOLineConfig = field(default_factory=GPIOLineConfig)
+    k1_output: GPIOLineConfig = field(default_factory=GPIOLineConfig)
+    k2_output: GPIOLineConfig = field(default_factory=GPIOLineConfig)
+
+
+@dataclass
 class WebSocketConfig:
     host: str = "10.42.0.1"
     port: int = 8765
@@ -57,6 +74,12 @@ class FireConfig:
     stop_duration_ms: int = 1000
     auto_reenergize: bool = False
     auto_home: bool = False
+
+
+@dataclass
+class VirtualHereConfig:
+    service_name: str = "virtualhere"
+    backend_controls_service: bool = False
 
 
 @dataclass
@@ -89,9 +112,11 @@ class AppConfig:
     controller: ControllerConfig = field(default_factory=ControllerConfig)
     laser: LaserConfig = field(default_factory=LaserConfig)
     camera: CameraConfig = field(default_factory=CameraConfig)
+    gpio: GPIOConfig = field(default_factory=GPIOConfig)
     websocket: WebSocketConfig = field(default_factory=WebSocketConfig)
     web: WebConfig = field(default_factory=WebConfig)
     fire: FireConfig = field(default_factory=FireConfig)
+    virtualhere: VirtualHereConfig = field(default_factory=VirtualHereConfig)
     network: NetworkConfig = field(default_factory=NetworkConfig)
     logging: LoggingConfig = field(default_factory=LoggingConfig)
     state_dir: Path = Path(".state")
@@ -109,9 +134,11 @@ def load_config(path: Path | None = None) -> AppConfig:
 def config_from_dict(raw: dict[str, Any]) -> AppConfig:
     laser = raw.get("laser", {})
     camera = raw.get("camera", {})
+    gpio = raw.get("gpio", {})
     websocket = raw.get("websocket", {})
     web = raw.get("web", {})
     fire = raw.get("fire", {})
+    virtualhere = raw.get("virtualhere", {})
     network = raw.get("network", {})
     private_ts1_ap = network.get("private_ts1_ap", {})
     logging = raw.get("logging", {})
@@ -134,6 +161,12 @@ def config_from_dict(raw: dict[str, Any]) -> AppConfig:
             stream_type=str(camera.get("stream_type", "webrtc")),
             resolution=str(camera.get("resolution", "highest_available")),
         ),
+        gpio=GPIOConfig(
+            power_input=_gpio_line(gpio.get("power_input", {})),
+            estop_input=_gpio_line(gpio.get("estop_input", {})),
+            k1_output=_gpio_line(gpio.get("k1_output", {})),
+            k2_output=_gpio_line(gpio.get("k2_output", {})),
+        ),
         websocket=WebSocketConfig(
             host=str(websocket.get("host", "10.42.0.1")),
             port=int(websocket.get("port", 8765)),
@@ -149,6 +182,10 @@ def config_from_dict(raw: dict[str, Any]) -> AppConfig:
             stop_duration_ms=int(fire.get("stop_duration_ms", 1000)),
             auto_reenergize=_as_bool(fire.get("auto_reenergize", False)),
             auto_home=_as_bool(fire.get("auto_home", False)),
+        ),
+        virtualhere=VirtualHereConfig(
+            service_name=str(virtualhere.get("service_name", "virtualhere")),
+            backend_controls_service=_as_bool(virtualhere.get("backend_controls_service", False)),
         ),
         network=NetworkConfig(
             ts1_ap_interface=str(private_ts1_ap.get("interface", "wlan0")),
@@ -172,6 +209,17 @@ def _usb_identity(raw: dict[str, Any]) -> USBIdentity:
         pid=raw.get("pid"),
         serial=raw.get("serial"),
         description_contains=raw.get("description_contains"),
+    )
+
+
+def _gpio_line(raw: dict[str, Any]) -> GPIOLineConfig:
+    line = raw.get("line")
+    return GPIOLineConfig(
+        chip=raw.get("chip"),
+        line=None if line is None else int(line),
+        board_pin=raw.get("board_pin"),
+        active_high=_as_bool(raw.get("active_high", True)),
+        bias=str(raw.get("bias", "none")),
     )
 
 

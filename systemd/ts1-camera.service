@@ -7,7 +7,11 @@ Wants=network-online.target
 Type=simple
 User=ts1-controller
 Group=ts1-controller
-ExecStart=/usr/bin/env sh -c 'echo WebRTC camera streamer command not configured; sleep infinity'
+WorkingDirectory=/opt/ts1-laser-controller
+Environment=CAMERA_DEVICE=/dev/video0
+Environment=CAMERA_RESOLUTION=highest_available
+Environment=CAMERA_FPS=30
+ExecStart=/opt/ts1-laser-controller/scripts/start-camera-webrtc.sh
 Restart=on-failure
 RestartSec=3
 
