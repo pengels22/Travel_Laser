@@ -36,6 +36,27 @@ async def test_web_estop_causes_k2_off():
     assert snapshot.physical.k2 is False
 
 
+async def test_software_estop_requires_physical_estop_cycle_to_clear():
+    state, gpio, safety = await _safety()
+    await safety.request_estop(EstopSource.WEB)
+    await safety.refresh_physical_inputs()
+    snapshot = await state.snapshot()
+    assert snapshot.safety.software_estop is True
+    assert snapshot.physical.k2 is False
+
+    gpio.estop_switch = True
+    await safety.refresh_physical_inputs()
+    snapshot = await state.snapshot()
+    assert snapshot.safety.software_estop is True
+    assert snapshot.physical.k2 is False
+
+    gpio.estop_switch = False
+    await safety.refresh_physical_inputs()
+    snapshot = await state.snapshot()
+    assert snapshot.safety.software_estop is False
+    assert snapshot.physical.k2 is True
+
+
 async def test_fire_does_nothing_when_disabled():
     state, _, safety = await _safety()
 
@@ -47,6 +68,38 @@ async def test_fire_does_nothing_when_disabled():
     await safety.evaluate_outputs()
     snapshot = await state.snapshot()
     assert snapshot.physical.k2 is True
+    assert snapshot.physical.k1 is True
+
+
+async def test_fire_drops_k1_and_k2_when_enabled():
+    state, _, safety = await _safety()
+
+    def mutate(snapshot):
+        snapshot.safety.fire_enabled = True
+        snapshot.safety.fire_active = True
+
+    await state.update(mutate)
+    await safety.evaluate_outputs()
+    snapshot = await state.snapshot()
+    assert snapshot.physical.k1 is False
+    assert snapshot.physical.k2 is False
+
+
+async def test_fire_estop_request_is_blocked_when_fire_sensor_disabled():
+    state, _, safety = await _safety()
+    await safety.request_estop(EstopSource.FIRE)
+    snapshot = await state.snapshot()
+    assert snapshot.physical.k1 is True
+    assert snapshot.physical.k2 is True
+    assert snapshot.safety.fire_active is False
+
+
+async def test_k1_stays_on_during_non_fire_estop():
+    state, _, safety = await _safety()
+    await safety.request_estop(EstopSource.WEB)
+    snapshot = await state.snapshot()
+    assert snapshot.physical.k1 is True
+    assert snapshot.physical.k2 is False
 
 
 async def test_lightburn_disconnect_idle_does_not_estop():
@@ -107,4 +160,3 @@ async def test_ts1_disconnect_does_not_affect_relays():
     after = await state.snapshot()
     assert after.physical.k1 == before.physical.k1
     assert after.physical.k2 == before.physical.k2
-

@@ -11,6 +11,6 @@ Main services:
 - Web portal serves camera/status/STOP/E-STOP controls.
 - Mode manager enforces exclusive Network vs VirtualHere ownership.
 
-Network mode owns the laser USB serial device. VirtualHere mode is a service/backup path and must not run concurrently with the GRBL proxy.
+Network mode owns the laser USB serial device. VirtualHere mode is a service/backup path and must not run concurrently with the GRBL proxy. VirtualHere will be installed on the Orange Pi, but its detailed configuration is handled separately from this first-pass backend.
 
 See `FIRMWARE.md` for notes from static inspection of the Sculpfun TS1 `v1.1.30` firmware update binary.

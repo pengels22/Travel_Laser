@@ -1,6 +1,8 @@
 controller:
   hostname: laserpi
 
+FIRE_SENSOR: false
+
 laser:
   tcp_port: 23
   # Confirmed GRBL serial baud rate.
@@ -25,23 +27,22 @@ camera:
 
 gpio:
   power_input:
-    # Orange Pi GPIO chip/line must be verified on the target Armbian image.
-    # PC14 is expected to appear on gpiochip0 or gpiochip1.
+    # PC12 high means the physical laser power switch is on.
     # Switch signal is deterministic; do not configure internal pull-up/down bias unless hardware changes.
-    chip: null
+    chip: gpiochip0
     line: null
-    board_pin: PC14
+    board_pin: PC12
     bias: none
     active_high: true
   estop_input:
-    # Orange Pi GPIO chip/line must be verified on the target Armbian image.
-    # PC15 is expected to appear on gpiochip0 or gpiochip1.
+    # PC15 high means E-stop OK. Low means E-stop active.
+    # active_high is false because the software state means "E-stop active".
     # Switch signal is deterministic; do not configure internal pull-up/down bias unless hardware changes.
-    chip: null
+    chip: gpiochip0
     line: null
     board_pin: PC15
     bias: none
-    active_high: true
+    active_high: false
   k1_output:
     # Relay output is confirmed active high.
     # PC5 is expected to appear on gpiochip0 or gpiochip1.
@@ -58,6 +59,8 @@ gpio:
     active_high: true
 
 fire:
+  # FIRE_SENSOR false blocks fire logic from affecting outputs until real fire hardware exists.
+  sensor_enabled: false
   enabled: false
   active: false
   drop_k2: true
@@ -68,9 +71,11 @@ fire:
 network:
   private_ts1_ap:
     enabled: true
+    always_enabled: true
+    interface: wlan0
     hidden: true
-    ssid: TS1-LINK
-    password: CHANGE_ME
+    ssid: TS1PE
+    password: AsDfGhJkL13579!
     address: 10.42.0.1/24
   uplink_wifi:
     enabled: true

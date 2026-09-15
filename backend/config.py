@@ -49,6 +49,7 @@ class WebConfig:
 @dataclass
 class FireConfig:
     enabled: bool = False
+    sensor_enabled: bool = False
     active: bool = False
     drop_k2: bool = True
     stop_duration_ms: int = 1000
@@ -60,6 +61,16 @@ class FireConfig:
 class LoggingConfig:
     level: str = "INFO"
     json_file: str | None = None
+
+
+@dataclass
+class NetworkConfig:
+    ts1_ap_interface: str = "wlan0"
+    ts1_ap_hidden: bool = True
+    ts1_ap_ssid: str = "TS1PE"
+    ts1_ap_password: str = "AsDfGhJkL13579!"
+    ts1_ap_always_enabled: bool = True
+    ethernet_preferred: bool = True
 
 
 @dataclass
@@ -75,6 +86,7 @@ class AppConfig:
     websocket: WebSocketConfig = field(default_factory=WebSocketConfig)
     web: WebConfig = field(default_factory=WebConfig)
     fire: FireConfig = field(default_factory=FireConfig)
+    network: NetworkConfig = field(default_factory=NetworkConfig)
     logging: LoggingConfig = field(default_factory=LoggingConfig)
     state_dir: Path = Path(".state")
 
@@ -94,6 +106,8 @@ def config_from_dict(raw: dict[str, Any]) -> AppConfig:
     websocket = raw.get("websocket", {})
     web = raw.get("web", {})
     fire = raw.get("fire", {})
+    network = raw.get("network", {})
+    private_ts1_ap = network.get("private_ts1_ap", {})
     logging = raw.get("logging", {})
     controller = raw.get("controller", {})
 
@@ -120,12 +134,21 @@ def config_from_dict(raw: dict[str, Any]) -> AppConfig:
         ),
         web=WebConfig(host=str(web.get("host", "0.0.0.0")), port=int(web.get("port", 8080))),
         fire=FireConfig(
-            enabled=bool(fire.get("enabled", False)),
-            active=bool(fire.get("active", False)),
-            drop_k2=bool(fire.get("drop_k2", True)),
+            enabled=_as_bool(fire.get("enabled", False)),
+            sensor_enabled=_as_bool(fire.get("sensor_enabled", raw.get("FIRE_SENSOR", False))),
+            active=_as_bool(fire.get("active", False)),
+            drop_k2=_as_bool(fire.get("drop_k2", True)),
             stop_duration_ms=int(fire.get("stop_duration_ms", 1000)),
-            auto_reenergize=bool(fire.get("auto_reenergize", False)),
-            auto_home=bool(fire.get("auto_home", False)),
+            auto_reenergize=_as_bool(fire.get("auto_reenergize", False)),
+            auto_home=_as_bool(fire.get("auto_home", False)),
+        ),
+        network=NetworkConfig(
+            ts1_ap_interface=str(private_ts1_ap.get("interface", "wlan0")),
+            ts1_ap_hidden=_as_bool(private_ts1_ap.get("hidden", True)),
+            ts1_ap_ssid=str(private_ts1_ap.get("ssid", "TS1PE")),
+            ts1_ap_password=str(private_ts1_ap.get("password", "AsDfGhJkL13579!")),
+            ts1_ap_always_enabled=_as_bool(private_ts1_ap.get("always_enabled", True)),
+            ethernet_preferred=_as_bool(network.get("ethernet_preferred", True)),
         ),
         logging=LoggingConfig(level=str(logging.get("level", "INFO")), json_file=logging.get("json_file")),
     )
@@ -139,3 +162,10 @@ def _usb_identity(raw: dict[str, Any]) -> USBIdentity:
         description_contains=raw.get("description_contains"),
     )
 
+
+def _as_bool(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "on"}
+    return bool(value)

@@ -7,7 +7,7 @@ Known relay meanings:
 
 Known Orange Pi pin assignments:
 
-- PC14: laser power button / physical latching power switch input.
+- PC12: laser power button / physical latching power switch input.
 - PC15: physical E-stop latching switch input.
 - PC5: K1 laser power relay output.
 - PC8: K2 E-stop relay output.
@@ -26,7 +26,11 @@ K2 behavior:
 
 Input behavior:
 
-- PC14 and PC15 switch inputs are not pulled up or down by the controller configuration.
+- PC12 and PC15 switch inputs are on `gpiochip0`.
+- PC12 high means the laser power switch is on.
+- PC15 high means E-stop OK. PC15 low means E-stop active.
+- Because internal software state tracks "E-stop active", PC15 is configured as active-low in `controller.yaml`.
+- PC12 and PC15 switch inputs are not pulled up or down by the controller configuration.
 - The switch signals are expected to be deterministic high or low with no floating/in-between state.
 - Do not enable internal GPIO pull-up/down bias unless the physical wiring changes.
 
@@ -34,9 +38,14 @@ Serial:
 
 - GRBL serial baud is confirmed at `115200`.
 
+Fire safety:
+
+- Fire handling code exists but is blocked by `FIRE_SENSOR: false` and `fire.sensor_enabled: false`.
+- When fire sensing is later enabled and fire is active, K1 and K2 should both drop.
+
 Open GPIO mapping item:
 
-- PC5, PC8, PC14, and PC15 are expected to appear on `gpiochip0` or `gpiochip1`.
+- PC5, PC8, PC12, and PC15 Linux line numbers must still be verified.
 - GPIO chip and Linux line numbers must still be verified on the real Orange Pi Zero 3 Armbian image using Orange Pi pinout documentation plus `gpioinfo`.
 - Configure `chip` and `line` in `/etc/ts1-controller/controller.yaml` after validation.
 

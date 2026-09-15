@@ -29,7 +29,7 @@ async def run(config_path: Path | None, mock: bool) -> None:
     await safety.initialize_safe()
 
     def apply_config(snapshot):
-        snapshot.safety.fire_enabled = config.fire.enabled
+        snapshot.safety.fire_enabled = config.fire.enabled and config.fire.sensor_enabled
         snapshot.camera.stream_url = config.camera.stream_url
 
     await state.update(apply_config)
@@ -98,4 +98,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

@@ -19,6 +19,7 @@ These instructions apply to the entire `Travel_Laser` workspace.
 - The selected laser connection mode is persistent across reboot and failures: `network` or `virtualhere`.
 - USB devices must be matched by VID, PID, serial, or descriptive fallback. Never assume `/dev/ttyUSB0` or `/dev/video0`.
 - Either physical USB port may contain either camera or laser; identity determines assignment.
+- The built-in `wlan0` adapter is the always-enabled hidden TS1 AP named `TS1PE`.
 
 ## Safety Rules
 
@@ -26,9 +27,12 @@ These instructions apply to the entire `Travel_Laser` workspace.
 - K1 is the laser power relay.
 - K2 is the hard E-stop relay and kills the laser controller completely.
 - K2 is normally energized during normal operation.
+- PC12 high means power switch on. PC15 high means E-stop OK, so PC15 low means E-stop active.
+- K1 stays active during E-stop if the power switch is on, except fire detection may drop K1 once fire sensing is enabled.
 - Any E-stop source must drop K2 immediately and mark the machine unhomed.
 - E-stop sources include physical E-stop, TS1 command, web command, software E-stop, active LightBurn stream loss, laser USB loss while K2 is expected on, and future fire logic.
-- Fire infrastructure must remain present, but `fire.enabled` defaults to `false`.
+- Fire infrastructure must remain present, but `fire.enabled` and `fire.sensor_enabled` default to `false`.
+- Software E-stop clearing requires a housing E-stop cycle: PC15 low, then PC15 high/OK.
 - Camera failure never stops the laser.
 - TS1 disconnect alone never stops the laser while the LightBurn control stream is healthy.
 - Unexpected LightBurn TCP stream loss during an active job is fatal and must drop K2.

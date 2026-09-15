@@ -23,6 +23,7 @@ class SafetyController:
         self.gpio = gpio
         self.event_sink = event_sink
         self.events: list[ControllerEvent] = []
+        self._software_clear_armed = False
 
     async def initialize_safe(self) -> None:
         await self.gpio.initialize_safe()
@@ -42,16 +43,27 @@ class SafetyController:
             snapshot.physical.estop_switch = estop
 
         await self.state.update(mutate)
+        if estop:
+            self._software_clear_armed = True
+        elif self._software_clear_armed:
+            await self.clear_software_estop()
+            self._software_clear_armed = False
         await self.evaluate_outputs()
 
     async def evaluate_outputs(self) -> None:
         snapshot = await self.state.snapshot()
-        k1_should_on = snapshot.physical.power_switch
+        fire_active = snapshot.safety.fire_enabled and snapshot.safety.fire_active
+        k1_should_on = snapshot.physical.power_switch and not fire_active
         k2_should_on = not self._any_estop(snapshot)
         await self.set_k1(k1_should_on)
         await self.set_k2(k2_should_on)
 
     async def request_estop(self, source: EstopSource, reason: str | None = None) -> None:
+        snapshot = await self.state.snapshot()
+        if source == EstopSource.FIRE and not snapshot.safety.fire_enabled:
+            self.record(EventCode.SOFTWARE_ESTOP, Severity.WARNING, source.value, {"blocked": "FIRE_SENSOR false"})
+            return
+
         event_code = {
             EstopSource.PHYSICAL: EventCode.PHYSICAL_ESTOP_ON,
             EstopSource.TS1: EventCode.TS1_ESTOP,
@@ -61,6 +73,8 @@ class SafetyController:
             EstopSource.USB: EventCode.LASER_USB_DISCONNECTED,
             EstopSource.FIRE: EventCode.SOFTWARE_ESTOP,
         }[source]
+        if source != EstopSource.PHYSICAL:
+            self._software_clear_armed = False
 
         def mutate(snapshot):
             if source == EstopSource.PHYSICAL:
@@ -75,6 +89,8 @@ class SafetyController:
             snapshot.machine.state = MachineState.FAULT
 
         await self.state.update(mutate)
+        if source == EstopSource.FIRE:
+            await self.set_k1(False)
         await self.set_k2(False)
         self.record(event_code, Severity.CRITICAL, source.value, {"reason": reason})
 
@@ -171,4 +187,3 @@ class SafetyController:
             or snapshot.safety.software_estop
             or fire_estop
         )
-
