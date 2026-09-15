@@ -78,6 +78,7 @@ network:
     password: AsDfGhJkL13579!
     address: 10.42.0.1/24
   uplink_wifi:
+    # Configurable from TS1 Settings menus. Must not modify wlan0/TS1PE.
     enabled: true
     interface: wlan1
     metric: 300

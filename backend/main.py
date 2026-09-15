@@ -10,6 +10,7 @@ from .gpio import LinuxGPIOBackend, MockGPIOBackend
 from .grbl_proxy import GrblProxy
 from .logging_setup import EventLogger, configure_logging
 from .mode_manager import ModeManager
+from .network_manager import NetworkManager
 from .safety import SafetyController
 from .state import ControllerState, LaserMode
 from .virtualhere import VirtualHereService
@@ -44,12 +45,14 @@ async def run(config_path: Path | None, mock: bool) -> None:
     virtualhere = VirtualHereService()
     state_dir = Path(".state") if mock else Path("/var/lib/ts1-controller")
     mode_manager = ModeManager(state, proxy, virtualhere, state_dir / "mode.json")
+    network_manager = NetworkManager(config.network.uplink_wifi_interface)
     restored_mode = await mode_manager.restore(LaserMode(config.laser.mode))
     ws_api = WebSocketAPI(
         state,
         safety,
         proxy,
         mode_manager,
+        network_manager,
         host=config.websocket.host,
         port=config.websocket.port,
         token=config.websocket.shared_token,

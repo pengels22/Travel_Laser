@@ -11,6 +11,7 @@ Planned behavior:
   - Main
   - Controls
   - Settings
+- Settings should scan/connect/forget uplink Wi-Fi on Orange Pi `wlan1`; never change the `wlan0` TS1 link.
 - Use LVGL, TFT_eSPI, and capacitive touch after exact display and touch hardware pinout is confirmed.
 
 Do not guess LCD, touch, or board pin mappings yet.

@@ -22,6 +22,7 @@ These instructions apply to the entire `Travel_Laser` workspace.
 - The deployed hostname is `Travel-Laser`.
 - The built-in `wlan0` adapter hosts the always-enabled hidden TS1 network named `TS1PE`; the TS1 connects to it as a client and should not run AP mode.
 - `eth0` is the preferred uplink with metric `100`; `wlan1` is secondary uplink with metric `300`.
+- TS1 Settings menus configure uplink Wi-Fi on `wlan1` only. They must not change or disable `wlan0`/`TS1PE`.
 
 ## Safety Rules
 

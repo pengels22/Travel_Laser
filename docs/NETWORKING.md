@@ -9,8 +9,9 @@ The intended deployment has a dedicated private TS1 AP and a separate uplink pat
 - TS1 private AP password is `AsDfGhJkL13579!`.
 - The built-in TS1 AP should remain enabled regardless of uplink state.
 - Uplink Wi-Fi uses `wlan1` with route metric `300`.
+- `wlan1` is configurable from the TS1 Settings menus for scan, connect/change, and forget.
 - Ethernet uses `eth0` with route metric `100`.
 - `eth0` is preferred over `wlan1` when both uplinks are connected.
 - Remote browser access is expected through Tailscale.
 
-Do not change or disable `wlan0` when configuring uplink Wi-Fi.
+Do not change or disable `wlan0` when configuring uplink Wi-Fi from TS1 menus.

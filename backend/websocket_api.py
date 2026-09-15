@@ -9,6 +9,7 @@ from websockets.exceptions import ConnectionClosed
 
 from .grbl_proxy import GrblProxy
 from .mode_manager import ModeManager
+from .network_manager import NetworkManager
 from .safety import EstopSource, SafetyController
 from .state import ControllerState, LaserMode, utc_now_iso
 
@@ -20,6 +21,7 @@ class WebSocketAPI:
         safety: SafetyController,
         proxy: GrblProxy,
         mode_manager: ModeManager,
+        network_manager: NetworkManager | None,
         host: str,
         port: int,
         token: str,
@@ -28,6 +30,7 @@ class WebSocketAPI:
         self.safety = safety
         self.proxy = proxy
         self.mode_manager = mode_manager
+        self.network_manager = network_manager or NetworkManager()
         self.host = host
         self.port = port
         self.token = token
@@ -154,8 +157,25 @@ class WebSocketAPI:
                 return self._ack(packet, False, "unknown laser mode")
             ok, reason = await self.mode_manager.switch(mode)
             return self._ack(packet, ok, reason)
-        if action in {"wifi_scan", "wifi_connect", "wifi_forget"}:
-            return self._ack(packet, True)
+        if action == "wifi_scan":
+            networks = await self.network_manager.scan_wifi()
+            response = self._ack(packet, True)
+            response["networks"] = [network.__dict__ for network in networks]
+            response["interface"] = self.network_manager.uplink_interface
+            return response
+        if action == "wifi_connect":
+            ssid = packet.get("ssid")
+            password = packet.get("password")
+            if not ssid or password is None:
+                return self._ack(packet, False, "ssid and password are required")
+            ok = await self.network_manager.connect_wifi(str(ssid), str(password))
+            return self._ack(packet, ok, None if ok else "wifi connect failed")
+        if action == "wifi_forget":
+            ssid = packet.get("ssid")
+            if not ssid:
+                return self._ack(packet, False, "ssid is required")
+            ok = await self.network_manager.forget_wifi(str(ssid))
+            return self._ack(packet, ok, None if ok else "wifi forget failed")
         return self._ack(packet, False, "unknown settings action")
 
     def _ack(self, packet: dict[str, Any], ok: bool, reason: str | None = None) -> dict[str, Any]:
@@ -163,4 +183,3 @@ class WebSocketAPI:
         if reason:
             response["reason"] = reason
         return response
-

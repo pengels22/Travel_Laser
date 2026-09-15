@@ -20,6 +20,14 @@ Supported packet groups:
 
 Every command, stop, or settings request returns an `ack` with `ok` and optional `reason`.
 
+TS1 settings Wi-Fi actions:
+
+- `wifi_scan`
+- `wifi_connect`
+- `wifi_forget`
+
+These actions apply only to uplink Wi-Fi on `wlan1`. They must not change or disable the hidden `wlan0` TS1 network.
+
 ## Web Portal
 
 - `GET /api/status`
