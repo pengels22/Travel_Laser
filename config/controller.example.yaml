@@ -24,21 +24,29 @@ camera:
 
 gpio:
   power_input:
+    # Orange Pi GPIO chip/line must be verified on the target Armbian image.
+    # PC14 is expected to appear on gpiochip0 or gpiochip1.
     chip: null
     line: null
     board_pin: PC14
     active_high: true
   estop_input:
+    # Orange Pi GPIO chip/line must be verified on the target Armbian image.
+    # PC15 is expected to appear on gpiochip0 or gpiochip1.
     chip: null
     line: null
     board_pin: PC15
     active_high: true
   k1_output:
+    # Relay output is confirmed active high.
+    # PC5 is expected to appear on gpiochip0 or gpiochip1.
     chip: null
     line: null
     board_pin: PC5
     active_high: true
   k2_output:
+    # Relay output is confirmed active high.
+    # PC8 is expected to appear on gpiochip0 or gpiochip1.
     chip: null
     line: null
     board_pin: PC8
