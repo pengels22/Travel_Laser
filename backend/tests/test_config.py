@@ -16,8 +16,8 @@ def test_example_config_captures_deployment_defaults():
     assert config.gpio.estop_input.line == 79
     assert config.gpio.estop_input.board_pin == "PC15"
     assert config.gpio.estop_input.active_high is False
-    assert config.gpio.k1_output.line == 69
-    assert config.gpio.k2_output.line == 72
+    assert config.gpio.k1_output.line == 72
+    assert config.gpio.k1_output.board_pin == "PC8"
     assert config.network.ts1_ap_interface == "wlan0"
     assert config.network.ts1_ap_hidden is True
     assert config.network.ts1_ap_ssid == "TS1PE"
@@ -29,6 +29,7 @@ def test_example_config_captures_deployment_defaults():
     assert config.network.uplink_wifi_metric == 300
     assert config.fire.enabled is False
     assert config.fire.sensor_enabled is False
+    assert config.fire.drop_k1 is True
     assert config.virtualhere.service_name == "virtualhere"
     assert config.virtualhere.backend_controls_service is False
 

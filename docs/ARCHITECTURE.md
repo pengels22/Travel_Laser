@@ -4,7 +4,7 @@
 
 Main services:
 
-- GPIO safety service owns K1/K2 relay outputs and physical inputs.
+- GPIO safety service owns the K1 hard E-stop relay output and physical inputs.
 - USB manager discovers laser and camera devices by identity.
 - GRBL proxy exposes the laser to LightBurn as a TCP GRBL device on port `23`.
 - WebSocket API serves the TS1 ESP32 HMI.

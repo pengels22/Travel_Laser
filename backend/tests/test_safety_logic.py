@@ -12,28 +12,28 @@ async def _safety(power_switch: bool = True):
     return state, gpio, safety
 
 
-async def test_physical_estop_causes_k2_off():
+async def test_physical_estop_causes_k1_off():
     state, gpio, safety = await _safety()
-    assert gpio.k2 is True
+    assert gpio.k1 is True
     gpio.estop_switch = True
     await safety.refresh_physical_inputs()
     snapshot = await state.snapshot()
-    assert snapshot.physical.k2 is False
+    assert snapshot.physical.k1 is False
 
 
-async def test_ts1_estop_causes_k2_off():
+async def test_ts1_estop_causes_k1_off():
     state, _, safety = await _safety()
     await safety.request_estop(EstopSource.TS1)
     snapshot = await state.snapshot()
-    assert snapshot.physical.k2 is False
+    assert snapshot.physical.k1 is False
     assert snapshot.machine.homed is False
 
 
-async def test_web_estop_causes_k2_off():
+async def test_web_estop_causes_k1_off():
     state, _, safety = await _safety()
     await safety.request_estop(EstopSource.WEB)
     snapshot = await state.snapshot()
-    assert snapshot.physical.k2 is False
+    assert snapshot.physical.k1 is False
 
 
 async def test_software_estop_requires_physical_estop_cycle_to_clear():
@@ -42,19 +42,19 @@ async def test_software_estop_requires_physical_estop_cycle_to_clear():
     await safety.refresh_physical_inputs()
     snapshot = await state.snapshot()
     assert snapshot.safety.software_estop is True
-    assert snapshot.physical.k2 is False
+    assert snapshot.physical.k1 is False
 
     gpio.estop_switch = True
     await safety.refresh_physical_inputs()
     snapshot = await state.snapshot()
     assert snapshot.safety.software_estop is True
-    assert snapshot.physical.k2 is False
+    assert snapshot.physical.k1 is False
 
     gpio.estop_switch = False
     await safety.refresh_physical_inputs()
     snapshot = await state.snapshot()
     assert snapshot.safety.software_estop is False
-    assert snapshot.physical.k2 is True
+    assert snapshot.physical.k1 is True
 
 
 async def test_fire_does_nothing_when_disabled():
@@ -67,11 +67,10 @@ async def test_fire_does_nothing_when_disabled():
     await state.update(mutate)
     await safety.evaluate_outputs()
     snapshot = await state.snapshot()
-    assert snapshot.physical.k2 is True
     assert snapshot.physical.k1 is True
 
 
-async def test_fire_drops_k1_and_k2_when_enabled():
+async def test_fire_drops_k1_when_enabled():
     state, _, safety = await _safety()
 
     def mutate(snapshot):
@@ -82,7 +81,6 @@ async def test_fire_drops_k1_and_k2_when_enabled():
     await safety.evaluate_outputs()
     snapshot = await state.snapshot()
     assert snapshot.physical.k1 is False
-    assert snapshot.physical.k2 is False
 
 
 async def test_fire_estop_request_is_blocked_when_fire_sensor_disabled():
@@ -90,16 +88,14 @@ async def test_fire_estop_request_is_blocked_when_fire_sensor_disabled():
     await safety.request_estop(EstopSource.FIRE)
     snapshot = await state.snapshot()
     assert snapshot.physical.k1 is True
-    assert snapshot.physical.k2 is True
     assert snapshot.safety.fire_active is False
 
 
-async def test_k1_stays_on_during_non_fire_estop():
+async def test_k1_drops_during_non_fire_estop():
     state, _, safety = await _safety()
     await safety.request_estop(EstopSource.WEB)
     snapshot = await state.snapshot()
-    assert snapshot.physical.k1 is True
-    assert snapshot.physical.k2 is False
+    assert snapshot.physical.k1 is False
 
 
 async def test_lightburn_disconnect_idle_does_not_estop():
@@ -112,10 +108,10 @@ async def test_lightburn_disconnect_idle_does_not_estop():
     await state.update(mutate)
     await safety.handle_lightburn_disconnect()
     snapshot = await state.snapshot()
-    assert snapshot.physical.k2 is True
+    assert snapshot.physical.k1 is True
 
 
-async def test_lightburn_disconnect_active_stream_drops_k2():
+async def test_lightburn_disconnect_active_stream_drops_k1():
     state, _, safety = await _safety()
 
     def mutate(snapshot):
@@ -125,22 +121,22 @@ async def test_lightburn_disconnect_active_stream_drops_k2():
     await state.update(mutate)
     await safety.handle_lightburn_disconnect()
     snapshot = await state.snapshot()
-    assert snapshot.physical.k2 is False
+    assert snapshot.physical.k1 is False
 
 
-async def test_laser_usb_disappearance_while_k2_on_drops_k2():
+async def test_laser_usb_disappearance_while_k1_on_drops_k1():
     state, _, safety = await _safety()
     await safety.handle_laser_usb_disconnected()
     snapshot = await state.snapshot()
-    assert snapshot.physical.k2 is False
+    assert snapshot.physical.k1 is False
 
 
-async def test_laser_usb_disappearance_while_k2_off_is_expected():
+async def test_laser_usb_disappearance_while_k1_off_is_expected():
     state, _, safety = await _safety()
-    await safety.set_k2(False)
+    await safety.set_k1(False)
     await safety.handle_laser_usb_disconnected()
     snapshot = await state.snapshot()
-    assert snapshot.physical.k2 is False
+    assert snapshot.physical.k1 is False
     assert snapshot.safety.software_estop is False
 
 
@@ -150,7 +146,6 @@ async def test_camera_disconnect_does_not_affect_relays():
     await safety.handle_camera_disconnected()
     after = await state.snapshot()
     assert after.physical.k1 == before.physical.k1
-    assert after.physical.k2 == before.physical.k2
 
 
 async def test_ts1_disconnect_does_not_affect_relays():
@@ -159,4 +154,3 @@ async def test_ts1_disconnect_does_not_affect_relays():
     await safety.handle_ts1_disconnected()
     after = await state.snapshot()
     assert after.physical.k1 == before.physical.k1
-    assert after.physical.k2 == before.physical.k2

@@ -25,7 +25,7 @@ Implemented:
 - Asyncio Python backend package.
 - Central asyncio-safe controller state.
 - Mock GPIO backend and config-driven Linux GPIO backend.
-- Safety controller for K1/K2 behavior.
+- Safety controller for the single K1 hard E-stop relay.
 - Mockable GRBL TCP proxy with realtime command injection.
 - Network vs VirtualHere mode manager with persistent mode file.
 - TS1-style WebSocket packet handling.
@@ -54,10 +54,10 @@ Note: GRBL network mode is fixed to TCP port `23`. On macOS and many Linux syste
 
 ## Safety Model
 
-- K1 controls laser power relay behavior.
-- K2 is normally energized and drops out on E-stop conditions, killing the laser controller completely.
-- K1 remains on during E-stop when the power switch is on, except enabled fire detection may drop K1.
-- E-stop sources include physical E-stop, TS1 WebSocket E-stop, web E-stop, software E-stop, future fire logic, active LightBurn stream loss, and laser USB loss while K2 is expected on.
+- Laser power is switched physically by the housing power switch.
+- K1 is the only relay and is normally energized during operation.
+- K1 drops out on E-stop conditions, killing the laser controller completely.
+- E-stop sources include physical E-stop, TS1 WebSocket E-stop, web E-stop, software E-stop, future fire logic, active LightBurn stream loss, and laser USB loss while K1 is expected on.
 - No job auto-resume is implemented after E-stop, reboot, power failure, controller reset, or unexpected laser USB loss.
 - Camera loss and TS1 disconnect alone are non-fatal.
 
@@ -67,10 +67,9 @@ Note: GRBL network mode is fixed to TCP port `23`. On macOS and many Linux syste
 | --- | --- | ---: | ---: | --- | --- |
 | Laser power switch | PC14 | 78 | 18 | Input | High = power on |
 | E-stop OK switch | PC15 | 79 | 16 | Input | High = OK, low = E-stop active |
-| K1 laser power relay | PC5 | 69 | 13 | Output | Active high |
-| K2 hard E-stop relay | PC8 | 72 | 15 | Output | Active high |
+| K1 hard E-stop relay | PC8 | 72 | 15 | Output | Active high |
 
-All four project GPIOs are configured on `gpiochip0`. PC14 and PC15 use `bias: none` because the switch signals are deterministic high/low from the wiring.
+All three project GPIOs are configured on `gpiochip0`. PC14 and PC15 use `bias: none` because the switch signals are deterministic high/low from the wiring.
 
 ## Remaining Hardware-Dependent Items
 

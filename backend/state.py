@@ -32,7 +32,6 @@ class PhysicalState:
     power_switch: bool = False
     estop_switch: bool = False
     k1: bool = False
-    k2: bool = False
 
 
 @dataclass

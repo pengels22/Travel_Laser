@@ -30,7 +30,6 @@ class SafetyController:
 
         def mutate(snapshot):
             snapshot.physical.k1 = False
-            snapshot.physical.k2 = False
 
         await self.state.update(mutate)
 
@@ -52,11 +51,8 @@ class SafetyController:
 
     async def evaluate_outputs(self) -> None:
         snapshot = await self.state.snapshot()
-        fire_active = snapshot.safety.fire_enabled and snapshot.safety.fire_active
-        k1_should_on = snapshot.physical.power_switch and not fire_active
-        k2_should_on = not self._any_estop(snapshot)
+        k1_should_on = not self._any_estop(snapshot)
         await self.set_k1(k1_should_on)
-        await self.set_k2(k2_should_on)
 
     async def request_estop(self, source: EstopSource, reason: str | None = None) -> None:
         snapshot = await self.state.snapshot()
@@ -89,9 +85,7 @@ class SafetyController:
             snapshot.machine.state = MachineState.FAULT
 
         await self.state.update(mutate)
-        if source == EstopSource.FIRE:
-            await self.set_k1(False)
-        await self.set_k2(False)
+        await self.set_k1(False)
         self.record(event_code, Severity.CRITICAL, source.value, {"reason": reason})
 
     async def clear_software_estop(self) -> None:
@@ -113,23 +107,11 @@ class SafetyController:
 
         def mutate(state):
             state.physical.k1 = energized
-
-        await self.state.update(mutate)
-        self.record(EventCode.K1_ON if energized else EventCode.K1_OFF)
-
-    async def set_k2(self, energized: bool) -> None:
-        snapshot = await self.state.snapshot()
-        if snapshot.physical.k2 == energized:
-            return
-        await self.gpio.set_k2(energized)
-
-        def mutate(state):
-            state.physical.k2 = energized
             if not energized:
                 state.machine.homed = False
 
         await self.state.update(mutate)
-        self.record(EventCode.K2_ON if energized else EventCode.K2_OFF)
+        self.record(EventCode.K1_ON if energized else EventCode.K1_OFF)
 
     async def handle_lightburn_disconnect(self) -> None:
         snapshot = await self.state.snapshot()
@@ -151,8 +133,8 @@ class SafetyController:
             state.machine.connected_to_grbl = False
 
         await self.state.update(mutate)
-        if snapshot.physical.k2:
-            await self.request_estop(EstopSource.USB, "laser USB lost while K2 expected on")
+        if snapshot.physical.k1:
+            await self.request_estop(EstopSource.USB, "laser USB lost while K1 expected on")
         else:
             self.record(EventCode.LASER_USB_DISCONNECTED, Severity.INFO, "usb", {"expected": True})
 

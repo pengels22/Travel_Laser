@@ -12,7 +12,6 @@ class GPIOBackend(Protocol):
     async def read_power_switch(self) -> bool: ...
     async def read_estop_switch(self) -> bool: ...
     async def set_k1(self, energized: bool) -> None: ...
-    async def set_k2(self, energized: bool) -> None: ...
 
 
 @dataclass
@@ -20,11 +19,9 @@ class MockGPIOBackend:
     power_switch: bool = False
     estop_switch: bool = False
     k1: bool = False
-    k2: bool = False
 
     async def initialize_safe(self) -> None:
         self.k1 = False
-        self.k2 = False
 
     async def read_power_switch(self) -> bool:
         return self.power_switch
@@ -34,9 +31,6 @@ class MockGPIOBackend:
 
     async def set_k1(self, energized: bool) -> None:
         self.k1 = energized
-
-    async def set_k2(self, energized: bool) -> None:
-        self.k2 = energized
 
 
 class LinuxGPIOBackend:
@@ -50,7 +44,6 @@ class LinuxGPIOBackend:
     async def initialize_safe(self) -> None:
         self._ensure_requested()
         await self.set_k1(False)
-        await self.set_k2(False)
 
     async def read_power_switch(self) -> bool:
         return await self._read("power_input", self.config.power_input)
@@ -61,23 +54,19 @@ class LinuxGPIOBackend:
     async def set_k1(self, energized: bool) -> None:
         await self._write("k1_output", self.config.k1_output, energized)
 
-    async def set_k2(self, energized: bool) -> None:
-        await self._write("k2_output", self.config.k2_output, energized)
-
     def _ensure_requested(self) -> None:
         try:
             import gpiod
         except ImportError as exc:
             raise RuntimeError("LinuxGPIOBackend requires python3-libgpiod or the gpiod Python package") from exc
 
-        chip_name = self.config.k1_output.chip or self.config.k2_output.chip
+        chip_name = self.config.k1_output.chip
         if not chip_name:
             raise ValueError("GPIO chip is required for LinuxGPIOBackend")
         self._chip = gpiod.Chip(chip_name)
         self._request_input(gpiod, "power_input", self.config.power_input)
         self._request_input(gpiod, "estop_input", self.config.estop_input)
         self._request_output(gpiod, "k1_output", self.config.k1_output, False)
-        self._request_output(gpiod, "k2_output", self.config.k2_output, False)
 
     def _request_input(self, gpiod, name: str, line_config: GPIOLineConfig) -> None:
         line = self._get_line(line_config)

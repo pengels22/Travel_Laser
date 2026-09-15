@@ -48,7 +48,6 @@ class GPIOConfig:
     power_input: GPIOLineConfig = field(default_factory=GPIOLineConfig)
     estop_input: GPIOLineConfig = field(default_factory=GPIOLineConfig)
     k1_output: GPIOLineConfig = field(default_factory=GPIOLineConfig)
-    k2_output: GPIOLineConfig = field(default_factory=GPIOLineConfig)
 
 
 @dataclass
@@ -70,7 +69,7 @@ class FireConfig:
     enabled: bool = False
     sensor_enabled: bool = False
     active: bool = False
-    drop_k2: bool = True
+    drop_k1: bool = True
     stop_duration_ms: int = 1000
     auto_reenergize: bool = False
     auto_home: bool = False
@@ -165,7 +164,6 @@ def config_from_dict(raw: dict[str, Any]) -> AppConfig:
             power_input=_gpio_line(gpio.get("power_input", {})),
             estop_input=_gpio_line(gpio.get("estop_input", {})),
             k1_output=_gpio_line(gpio.get("k1_output", {})),
-            k2_output=_gpio_line(gpio.get("k2_output", {})),
         ),
         websocket=WebSocketConfig(
             host=str(websocket.get("host", "10.42.0.1")),
@@ -178,7 +176,7 @@ def config_from_dict(raw: dict[str, Any]) -> AppConfig:
             enabled=_as_bool(fire.get("enabled", False)),
             sensor_enabled=_as_bool(fire.get("sensor_enabled", raw.get("FIRE_SENSOR", False))),
             active=_as_bool(fire.get("active", False)),
-            drop_k2=_as_bool(fire.get("drop_k2", True)),
+            drop_k1=_as_bool(fire.get("drop_k1", True)),
             stop_duration_ms=int(fire.get("stop_duration_ms", 1000)),
             auto_reenergize=_as_bool(fire.get("auto_reenergize", False)),
             auto_home=_as_bool(fire.get("auto_home", False)),

@@ -46,13 +46,7 @@ gpio:
     bias: none
     active_high: false
   k1_output:
-    # Relay output is confirmed active high.
-    chip: gpiochip0
-    line: 69
-    board_pin: PC5
-    active_high: true
-  k2_output:
-    # Relay output is confirmed active high.
+    # Single hard E-stop relay output. Relay output is confirmed active high.
     chip: gpiochip0
     line: 72
     board_pin: PC8
@@ -63,7 +57,7 @@ fire:
   sensor_enabled: false
   enabled: false
   active: false
-  drop_k2: true
+  drop_k1: true
   stop_duration_ms: 1000
   auto_reenergize: false
   auto_home: false

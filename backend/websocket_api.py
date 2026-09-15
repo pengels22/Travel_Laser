@@ -83,7 +83,6 @@ class WebSocketAPI:
                 "power_switch": state["physical"]["power_switch"],
                 "estop_switch": state["physical"]["estop_switch"],
                 "k1": state["physical"]["k1"],
-                "k2": state["physical"]["k2"],
                 "laser_usb": state["machine"]["laser_usb_connected"],
                 "camera_usb": state["camera"]["connected"],
             },

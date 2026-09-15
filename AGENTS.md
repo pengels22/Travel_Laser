@@ -27,20 +27,19 @@ These instructions apply to the entire `Travel_Laser` workspace.
 ## Safety Rules
 
 - Physical GPIO outputs must initialize safe before higher-level services start.
-- K1 is the laser power relay.
-- K2 is the hard E-stop relay and kills the laser controller completely.
-- K2 is normally energized during normal operation.
+- K1 is the only relay. It is the hard E-stop relay and kills the laser controller completely.
+- Laser power is switched physically by the housing power switch, not by a relay.
+- K1 is normally energized during normal operation.
 - PC14 high means power switch on. PC15 high means E-stop OK, so PC15 low means E-stop active.
-- K1 stays active during E-stop if the power switch is on, except fire detection may drop K1 once fire sensing is enabled.
-- Any E-stop source must drop K2 immediately and mark the machine unhomed.
-- E-stop sources include physical E-stop, TS1 command, web command, software E-stop, active LightBurn stream loss, laser USB loss while K2 is expected on, and future fire logic.
+- Any E-stop source must drop K1 immediately and mark the machine unhomed.
+- E-stop sources include physical E-stop, TS1 command, web command, software E-stop, active LightBurn stream loss, laser USB loss while K1 is expected on, and future fire logic.
 - Fire infrastructure must remain present, but `fire.enabled` and `fire.sensor_enabled` default to `false`.
 - Software E-stop clearing requires a housing E-stop cycle: PC15 low, then PC15 high/OK.
 - Camera failure never stops the laser.
 - TS1 disconnect alone never stops the laser while the LightBurn control stream is healthy.
-- Unexpected LightBurn TCP stream loss during an active job is fatal and must drop K2.
-- Unexpected laser USB disappearance while K2 is supposed to be energized is fatal and must drop K2.
-- If K2 is intentionally dropped, laser USB disappearance is expected and should not create a second USB fault.
+- Unexpected LightBurn TCP stream loss during an active job is fatal and must drop K1.
+- Unexpected laser USB disappearance while K1 is supposed to be energized is fatal and must drop K1.
+- If K1 is intentionally dropped, laser USB disappearance is expected and should not create a second USB fault.
 - Never implement automatic job resume after E-stop, Pi reboot, power failure, controller reset, or unexpected laser USB loss.
 - After recovery, LightBurn is responsible for reconnecting and homing.
 

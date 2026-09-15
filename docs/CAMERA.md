@@ -9,6 +9,6 @@ Camera streaming is WebRTC for deployment.
 - The backend does not transcode camera video.
 - `scripts/select-camera-mode.sh` selects the largest advertised V4L2 resolution.
 - The camera service starts at 30 FPS by default; confirm the highest stable resolution/FPS after the physical camera is present.
-- Camera failure never stops the laser and must not affect K1/K2.
+- Camera failure never stops the laser and must not affect K1.
 
 The exact camera USB identity remains hardware-dependent.

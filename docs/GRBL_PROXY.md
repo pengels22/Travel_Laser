@@ -11,4 +11,4 @@ Realtime injections:
 - Stop: `0x18`
 - Status poll: `?`
 
-Idle-only commands such as `$H` and `$J=` are rejected while a job stream is active. If the LightBurn TCP stream disappears during an active job, K2 must drop immediately.
+Idle-only commands such as `$H` and `$J=` are rejected while a job stream is active. If the LightBurn TCP stream disappears during an active job, K1 must drop immediately.

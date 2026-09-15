@@ -12,4 +12,3 @@ async def test_state_updates_are_snapshot_based():
     data = await state.to_dict()
     assert data["physical"]["k1"] is True
     assert data["mode"]["laser_mode"] == "virtualhere"
-

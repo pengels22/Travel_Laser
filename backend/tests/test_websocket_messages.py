@@ -28,7 +28,7 @@ async def test_ts1_hello_and_estop_ack(tmp_path: Path):
     ack = await api.handle_packet({"type": "stop", "id": 3, "action": "estop"})
     assert ack == {"type": "ack", "id": 3, "ok": True}
     snapshot = await state.snapshot()
-    assert snapshot.physical.k2 is False
+    assert snapshot.physical.k1 is False
 
 
 async def test_ts1_wifi_settings_apply_to_wlan1(tmp_path: Path):

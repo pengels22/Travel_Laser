@@ -37,7 +37,6 @@ The archive contains a single compiled ESP32 firmware image. It does not contain
 - Exact Orange Pi GPIO chip/line numbers.
 - Runtime default Telnet port, HTTP port, hostname, SSID, or password values.
 - TS1 display/touch pin mappings.
-- Whether K2 causes USB disappearance or only interrupts motion/enable.
+- Whether K1 causes USB disappearance or only interrupts motion/enable.
 
 Use `scripts/identify-usb.sh`, Orange Pi pinout documentation, and live `gpioinfo`/USB inspection on the real hardware to resolve those items.
-

@@ -23,8 +23,6 @@ class EventCode(str, Enum):
     SOFTWARE_ESTOP = "SOFTWARE_ESTOP"
     K1_ON = "K1_ON"
     K1_OFF = "K1_OFF"
-    K2_ON = "K2_ON"
-    K2_OFF = "K2_OFF"
     LIGHTBURN_CONNECTED = "LIGHTBURN_CONNECTED"
     LIGHTBURN_DISCONNECTED = "LIGHTBURN_DISCONNECTED"
     LIGHTBURN_STREAM_STARTED = "LIGHTBURN_STREAM_STARTED"
@@ -62,4 +60,3 @@ class ControllerEvent:
             "source": self.source,
             "details": self.details,
         }
-
