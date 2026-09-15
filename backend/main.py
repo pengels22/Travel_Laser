@@ -31,6 +31,7 @@ async def run(config_path: Path | None, mock: bool) -> None:
     def apply_config(snapshot):
         snapshot.safety.fire_enabled = config.fire.enabled and config.fire.sensor_enabled
         snapshot.camera.stream_url = config.camera.stream_url
+        snapshot.camera.stream_type = config.camera.stream_type
 
     await state.update(apply_config)
 

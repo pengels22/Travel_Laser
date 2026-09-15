@@ -28,3 +28,4 @@ Every command, stop, or settings request returns an `ack` with `ok` and optional
 
 The web portal intentionally excludes jog, home, Wi-Fi settings, and mode switching.
 
+The web portal is hosted on `0.0.0.0:8080` and embeds the configured WebRTC camera stream in a simple viewer.

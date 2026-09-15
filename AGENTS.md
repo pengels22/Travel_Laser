@@ -19,7 +19,9 @@ These instructions apply to the entire `Travel_Laser` workspace.
 - The selected laser connection mode is persistent across reboot and failures: `network` or `virtualhere`.
 - USB devices must be matched by VID, PID, serial, or descriptive fallback. Never assume `/dev/ttyUSB0` or `/dev/video0`.
 - Either physical USB port may contain either camera or laser; identity determines assignment.
-- The built-in `wlan0` adapter is the always-enabled hidden TS1 AP named `TS1PE`.
+- The deployed hostname is `Travel-Laser`.
+- The built-in `wlan0` adapter hosts the always-enabled hidden TS1 network named `TS1PE`; the TS1 connects to it as a client and should not run AP mode.
+- `eth0` is the preferred uplink with metric `100`; `wlan1` is secondary uplink with metric `300`.
 
 ## Safety Rules
 
@@ -27,7 +29,7 @@ These instructions apply to the entire `Travel_Laser` workspace.
 - K1 is the laser power relay.
 - K2 is the hard E-stop relay and kills the laser controller completely.
 - K2 is normally energized during normal operation.
-- PC12 high means power switch on. PC15 high means E-stop OK, so PC15 low means E-stop active.
+- PC14 high means power switch on. PC15 high means E-stop OK, so PC15 low means E-stop active.
 - K1 stays active during E-stop if the power switch is on, except fire detection may drop K1 once fire sensing is enabled.
 - Any E-stop source must drop K2 immediately and mark the machine unhomed.
 - E-stop sources include physical E-stop, TS1 command, web command, software E-stop, active LightBurn stream loss, laser USB loss while K2 is expected on, and future fire logic.

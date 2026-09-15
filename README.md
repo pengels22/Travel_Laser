@@ -1,6 +1,6 @@
 # ts1-laser-controller
 
-Orange Pi Zero 3 backend for a Sculpfun TS1 laser controller retrofit.
+Orange Pi Zero 3 backend for a Sculpfun TS1 laser controller retrofit. The deployed hostname is `Travel-Laser`.
 
 Normal network mode:
 
@@ -14,7 +14,7 @@ Service mode:
 Mac or service computer -> VirtualHere -> Orange Pi USB -> laser controller
 ```
 
-The TS1 ESP32 HMI is planned to connect over a dedicated private Wi-Fi AP and talk to the backend through WebSocket at `ws://10.42.0.1:8765/ws`.
+The TS1 ESP32 HMI connects as a client to the hidden `TS1PE` network hosted by the Orange Pi built-in `wlan0`, then talks to the backend through WebSocket at `ws://10.42.0.1:8765/ws`.
 
 ## Current Status
 
@@ -65,5 +65,5 @@ Note: GRBL network mode is fixed to TCP port `23`. On macOS and many Linux syste
 - Identify laser USB VID/PID/serial.
 - Identify camera USB VID/PID/serial.
 - Confirm VirtualHere installation/service behavior.
-- Confirm camera streamer command and service.
+- Confirm WebRTC camera streamer command and service.
 - Confirm TS1 display, touch, and ESP32 pinout before firmware UI work.

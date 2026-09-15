@@ -7,10 +7,9 @@ Wants=network-online.target
 Type=simple
 User=ts1-controller
 Group=ts1-controller
-ExecStart=/usr/bin/env sh -c 'echo camera streamer command not configured; sleep infinity'
+ExecStart=/usr/bin/env sh -c 'echo WebRTC camera streamer command not configured; sleep infinity'
 Restart=on-failure
 RestartSec=3
 
 [Install]
 WantedBy=multi-user.target
-

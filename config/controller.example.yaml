@@ -1,5 +1,5 @@
 controller:
-  hostname: laserpi
+  hostname: Travel-Laser
 
 FIRE_SENSOR: false
 
@@ -18,6 +18,8 @@ laser:
 
 camera:
   enabled: true
+  stream_type: webrtc
+  resolution: highest_available
   usb:
     vid: null
     pid: null
@@ -27,11 +29,11 @@ camera:
 
 gpio:
   power_input:
-    # PC12 high means the physical laser power switch is on.
+    # PC14 high means the physical laser power switch is on.
     # Switch signal is deterministic; do not configure internal pull-up/down bias unless hardware changes.
     chip: gpiochip0
-    line: null
-    board_pin: PC12
+    line: 78
+    board_pin: PC14
     bias: none
     active_high: true
   estop_input:
@@ -39,22 +41,20 @@ gpio:
     # active_high is false because the software state means "E-stop active".
     # Switch signal is deterministic; do not configure internal pull-up/down bias unless hardware changes.
     chip: gpiochip0
-    line: null
+    line: 79
     board_pin: PC15
     bias: none
     active_high: false
   k1_output:
     # Relay output is confirmed active high.
-    # PC5 is expected to appear on gpiochip0 or gpiochip1.
-    chip: null
-    line: null
+    chip: gpiochip0
+    line: 69
     board_pin: PC5
     active_high: true
   k2_output:
     # Relay output is confirmed active high.
-    # PC8 is expected to appear on gpiochip0 or gpiochip1.
-    chip: null
-    line: null
+    chip: gpiochip0
+    line: 72
     board_pin: PC8
     active_high: true
 
@@ -79,7 +79,11 @@ network:
     address: 10.42.0.1/24
   uplink_wifi:
     enabled: true
-    interface_hint: null
+    interface: wlan1
+    metric: 300
+  ethernet:
+    interface: eth0
+    metric: 100
   ethernet_preferred: true
 
 websocket:

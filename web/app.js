@@ -21,11 +21,32 @@ function renderStatus(state) {
     error.hidden = true;
   }
 
+  renderCamera(state.camera);
+}
+
+function renderCamera(camera) {
   const frame = document.getElementById("camera-frame");
-  if (state.camera.stream_url && !frame.querySelector("img")) {
+  if (!camera.stream_url) {
+    frame.innerHTML = '<span id="camera-placeholder">No WebRTC stream configured</span>';
+    return;
+  }
+
+  if (camera.stream_type === "webrtc") {
+    const existing = frame.querySelector("iframe");
+    if (existing && existing.src === camera.stream_url) return;
+    frame.innerHTML = "";
+    const iframe = document.createElement("iframe");
+    iframe.src = camera.stream_url;
+    iframe.title = "WebRTC camera stream";
+    iframe.allow = "autoplay; fullscreen; camera";
+    iframe.referrerPolicy = "no-referrer";
+    frame.appendChild(iframe);
+  } else {
+    const existing = frame.querySelector("img");
+    if (existing && existing.src === camera.stream_url) return;
     frame.innerHTML = "";
     const img = document.createElement("img");
-    img.src = state.camera.stream_url;
+    img.src = camera.stream_url;
     img.alt = "Camera stream";
     frame.appendChild(img);
   }
@@ -45,4 +66,3 @@ document.getElementById("estop").addEventListener("click", () => post("/api/esto
 
 fetchStatus();
 setInterval(fetchStatus, 1000);
-

@@ -4,7 +4,7 @@ This is a minimal PlatformIO scaffold for the future TS1 HMI firmware.
 
 Planned behavior:
 
-- Connect to hidden `TS1PE` AP.
+- Connect as a client to the hidden `TS1PE` network hosted by the Orange Pi `wlan0` adapter.
 - Open WebSocket connection to `ws://10.42.0.1:8765/ws`.
 - Send hello packet with shared token.
 - Show three pages:

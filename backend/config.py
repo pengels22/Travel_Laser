@@ -30,6 +30,8 @@ class CameraConfig:
     enabled: bool = True
     usb: USBIdentity = field(default_factory=USBIdentity)
     stream_url: str | None = None
+    stream_type: str = "webrtc"
+    resolution: str = "highest_available"
 
 
 @dataclass
@@ -70,12 +72,16 @@ class NetworkConfig:
     ts1_ap_ssid: str = "TS1PE"
     ts1_ap_password: str = "AsDfGhJkL13579!"
     ts1_ap_always_enabled: bool = True
+    uplink_wifi_interface: str = "wlan1"
+    ethernet_interface: str = "eth0"
+    ethernet_metric: int = 100
+    uplink_wifi_metric: int = 300
     ethernet_preferred: bool = True
 
 
 @dataclass
 class ControllerConfig:
-    hostname: str = "laserpi"
+    hostname: str = "Travel-Laser"
 
 
 @dataclass
@@ -112,7 +118,7 @@ def config_from_dict(raw: dict[str, Any]) -> AppConfig:
     controller = raw.get("controller", {})
 
     return AppConfig(
-        controller=ControllerConfig(hostname=controller.get("hostname", "laserpi")),
+        controller=ControllerConfig(hostname=controller.get("hostname", "Travel-Laser")),
         laser=LaserConfig(
             tcp_port=int(laser.get("tcp_port", 23)),
             baud=int(laser.get("baud", 115200)),
@@ -125,6 +131,8 @@ def config_from_dict(raw: dict[str, Any]) -> AppConfig:
             enabled=bool(camera.get("enabled", True)),
             usb=_usb_identity(camera.get("usb", {})),
             stream_url=camera.get("stream_url"),
+            stream_type=str(camera.get("stream_type", "webrtc")),
+            resolution=str(camera.get("resolution", "highest_available")),
         ),
         websocket=WebSocketConfig(
             host=str(websocket.get("host", "10.42.0.1")),
@@ -148,6 +156,10 @@ def config_from_dict(raw: dict[str, Any]) -> AppConfig:
             ts1_ap_ssid=str(private_ts1_ap.get("ssid", "TS1PE")),
             ts1_ap_password=str(private_ts1_ap.get("password", "AsDfGhJkL13579!")),
             ts1_ap_always_enabled=_as_bool(private_ts1_ap.get("always_enabled", True)),
+            uplink_wifi_interface=str(network.get("uplink_wifi", {}).get("interface", "wlan1")),
+            ethernet_interface=str(network.get("ethernet", {}).get("interface", "eth0")),
+            ethernet_metric=int(network.get("ethernet", {}).get("metric", 100)),
+            uplink_wifi_metric=int(network.get("uplink_wifi", {}).get("metric", 300)),
             ethernet_preferred=_as_bool(network.get("ethernet_preferred", True)),
         ),
         logging=LoggingConfig(level=str(logging.get("level", "INFO")), json_file=logging.get("json_file")),

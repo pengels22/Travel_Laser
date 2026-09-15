@@ -64,6 +64,7 @@ class TS1State:
 class CameraState:
     connected: bool = False
     stream_url: str | None = None
+    stream_type: str = "webrtc"
 
 
 @dataclass
@@ -155,4 +156,3 @@ def _enum_to_value(value: Any) -> Any:
     if isinstance(value, tuple):
         return [_enum_to_value(item) for item in value]
     return value
-
