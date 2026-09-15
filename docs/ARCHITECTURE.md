@@ -13,3 +13,4 @@ Main services:
 
 Network mode owns the laser USB serial device. VirtualHere mode is a service/backup path and must not run concurrently with the GRBL proxy.
 
+See `FIRMWARE.md` for notes from static inspection of the Sculpfun TS1 `v1.1.30` firmware update binary.
