@@ -3,6 +3,7 @@ controller:
 
 laser:
   tcp_port: 23
+  # Confirmed GRBL serial baud rate.
   baud: 115200
   mode: network
   usb:
@@ -26,16 +27,20 @@ gpio:
   power_input:
     # Orange Pi GPIO chip/line must be verified on the target Armbian image.
     # PC14 is expected to appear on gpiochip0 or gpiochip1.
+    # Switch signal is deterministic; do not configure internal pull-up/down bias unless hardware changes.
     chip: null
     line: null
     board_pin: PC14
+    bias: none
     active_high: true
   estop_input:
     # Orange Pi GPIO chip/line must be verified on the target Armbian image.
     # PC15 is expected to appear on gpiochip0 or gpiochip1.
+    # Switch signal is deterministic; do not configure internal pull-up/down bias unless hardware changes.
     chip: null
     line: null
     board_pin: PC15
+    bias: none
     active_high: true
   k1_output:
     # Relay output is confirmed active high.

@@ -17,6 +17,16 @@ Relay polarity:
 - K1 is confirmed active high.
 - K2 is confirmed active high.
 
+Input behavior:
+
+- PC14 and PC15 switch inputs are not pulled up or down by the controller configuration.
+- The switch signals are expected to be deterministic high or low with no floating/in-between state.
+- Do not enable internal GPIO pull-up/down bias unless the physical wiring changes.
+
+Serial:
+
+- GRBL serial baud is confirmed at `115200`.
+
 Open GPIO mapping item:
 
 - PC5, PC8, PC14, and PC15 are expected to appear on `gpiochip0` or `gpiochip1`.
