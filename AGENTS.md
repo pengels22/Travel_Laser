@@ -24,7 +24,7 @@ These instructions apply to the entire `Travel_Laser` workspace.
 
 - Physical GPIO outputs must initialize safe before higher-level services start.
 - K1 is the laser power relay.
-- K2 is the E-stop/interrupt relay.
+- K2 is the hard E-stop relay and kills the laser controller completely.
 - K2 is normally energized during normal operation.
 - Any E-stop source must drop K2 immediately and mark the machine unhomed.
 - E-stop sources include physical E-stop, TS1 command, web command, software E-stop, active LightBurn stream loss, laser USB loss while K2 is expected on, and future fire logic.

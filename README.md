@@ -53,7 +53,7 @@ Note: GRBL network mode is fixed to TCP port `23`. On macOS and many Linux syste
 ## Safety Model
 
 - K1 controls laser power relay behavior.
-- K2 is normally energized and drops out on E-stop conditions.
+- K2 is normally energized and drops out on E-stop conditions, killing the laser controller completely.
 - E-stop sources include physical E-stop, TS1 WebSocket E-stop, web E-stop, software E-stop, future fire logic, active LightBurn stream loss, and laser USB loss while K2 is expected on.
 - No job auto-resume is implemented after E-stop, reboot, power failure, controller reset, or unexpected laser USB loss.
 - Camera loss and TS1 disconnect alone are non-fatal.

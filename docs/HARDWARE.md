@@ -3,19 +3,26 @@
 Known relay meanings:
 
 - K1: laser power relay.
-- K2: E-stop / interrupt relay.
+- K2: E-stop relay that kills the laser controller completely.
 
 Known Orange Pi pin assignments:
 
 - PC14: laser power button / physical latching power switch input.
 - PC15: physical E-stop latching switch input.
 - PC5: K1 laser power relay output.
-- PC8: K2 E-stop / interrupt relay output.
+- PC8: K2 E-stop relay output.
 
 Relay polarity:
 
 - K1 is confirmed active high.
 - K2 is confirmed active high.
+
+K2 behavior:
+
+- K2 is the hard E-stop path.
+- Dropping K2 kills the laser controller completely.
+- The laser USB serial device is expected to disappear when K2 drops.
+- USB disappearance after an intentional K2 drop is normal and must not be logged as a second critical USB fault.
 
 Input behavior:
 
