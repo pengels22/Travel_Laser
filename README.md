@@ -61,6 +61,17 @@ Note: GRBL network mode is fixed to TCP port `23`. On macOS and many Linux syste
 - No job auto-resume is implemented after E-stop, reboot, power failure, controller reset, or unexpected laser USB loss.
 - Camera loss and TS1 disconnect alone are non-fatal.
 
+## Orange Pi Pinout
+
+| Function | Orange Pi pin | Linux GPIO | Header pin | Direction | Active state |
+| --- | --- | ---: | ---: | --- | --- |
+| Laser power switch | PC14 | 78 | 18 | Input | High = power on |
+| E-stop OK switch | PC15 | 79 | 16 | Input | High = OK, low = E-stop active |
+| K1 laser power relay | PC5 | 69 | 13 | Output | Active high |
+| K2 hard E-stop relay | PC8 | 72 | 15 | Output | Active high |
+
+All four project GPIOs are configured on `gpiochip0`. PC14 and PC15 use `bias: none` because the switch signals are deterministic high/low from the wiring.
+
 ## Remaining Hardware-Dependent Items
 
 - Identify laser USB VID/PID/serial.
