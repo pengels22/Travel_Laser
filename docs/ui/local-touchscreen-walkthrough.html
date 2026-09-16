@@ -573,6 +573,7 @@
             ${row("E-stop Sense", "OK", "ok")}
             ${row("Safety Relay", "Engaged", "ok")}
             ${row("Laser USB", "Connected", "ok")}
+            ${row("Tailscale", "Waiting", "warn")}
           </div>
         `;
       }
@@ -670,7 +671,7 @@
           <div class="subpage">
             ${subhead("View Logs")}
             <div class="log-box">20:14:05 INFO controller ready in network mode
-20:14:07 INFO web portal started on 0.0.0.0:8080
+20:14:07 INFO web portal waiting for Tailscale IP
 20:14:10 INFO laser usb connected
 20:14:12 INFO LightBurn connected
 20:15:03 INFO status poll: Idle

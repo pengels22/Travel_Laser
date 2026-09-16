@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from backend.config import config_from_dict, load_config
+from backend.main import _resolve_web_host
 
 
 def test_example_config_captures_deployment_defaults():
@@ -34,6 +35,12 @@ def test_example_config_captures_deployment_defaults():
     assert config.network.ethernet_metric == 100
     assert config.network.uplink_wifi_interface == "wlan1"
     assert config.network.uplink_wifi_metric == 300
+    assert config.network.tailscale_enabled is True
+    assert config.network.tailscale_interface == "tailscale0"
+    assert config.network.tailscale_ip is None
+    assert config.web.host is None
+    assert config.web.bind_to_tailscale is True
+    assert config.web.port == 8080
     assert config.fire.enabled is False
     assert config.fire.sensor_enabled is False
     assert config.fire.drop_k1 is True
@@ -44,6 +51,28 @@ def test_example_config_captures_deployment_defaults():
 def test_uppercase_fire_sensor_false_parses_false():
     config = config_from_dict({"FIRE_SENSOR": "FALSE"})
     assert config.fire.sensor_enabled is False
+
+
+def test_web_host_resolves_to_tailscale_ip_when_required():
+    config = config_from_dict(
+        {
+            "web": {"bind_to_tailscale": True},
+            "network": {"tailscale": {"ip_address": "100.64.12.34"}},
+        }
+    )
+
+    assert _resolve_web_host(config) == "100.64.12.34"
+
+
+def test_web_host_requires_tailscale_ip_when_tailscale_only():
+    config = config_from_dict({"web": {"bind_to_tailscale": True}, "network": {"tailscale": {"ip_address": None}}})
+
+    try:
+        _resolve_web_host(config)
+    except RuntimeError as exc:
+        assert "network.tailscale.ip_address" in str(exc)
+    else:
+        raise AssertionError("expected Tailscale-only web binding to require an IP")
 
 
 def test_example_config_has_no_gpio_line_overlaps():

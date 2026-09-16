@@ -5,7 +5,7 @@ import asyncio
 import logging
 from pathlib import Path
 
-from .config import load_config
+from .config import AppConfig, load_config
 from .gpio import LinuxGPIOBackend, MockGPIOBackend
 from .grbl_proxy import GrblProxy
 from .logging_setup import EventLogger, configure_logging
@@ -31,6 +31,16 @@ async def run(config_path: Path | None, mock: bool) -> None:
         snapshot.safety.fire_enabled = config.fire.enabled and config.fire.sensor_enabled
         snapshot.camera.stream_url = config.camera.stream_url
         snapshot.camera.stream_type = config.camera.stream_type
+        snapshot.network.tailscale_interface = config.network.tailscale_interface
+        snapshot.network.tailscale_ip = config.network.tailscale_ip
+        snapshot.network.tailscale_connected = bool(config.network.tailscale_enabled and config.network.tailscale_ip)
+        snapshot.network.tailscale_status = (
+            "connected"
+            if snapshot.network.tailscale_connected
+            else "waiting for Tailscale IP"
+            if config.network.tailscale_enabled
+            else "disabled"
+        )
 
     await state.update(apply_config)
 
@@ -53,7 +63,7 @@ async def run(config_path: Path | None, mock: bool) -> None:
         safety,
         proxy,
         static_dir=Path(__file__).resolve().parent.parent / "web",
-        host=config.web.host,
+        host=_resolve_web_host(config),
         port=config.web.port,
     )
 
@@ -87,6 +97,17 @@ def main() -> None:
     parser.add_argument("--mock", action="store_true", help="use mock GPIO/serial hardware")
     args = parser.parse_args()
     asyncio.run(run(args.config, args.mock))
+
+
+def _resolve_web_host(config: AppConfig) -> str:
+    if config.web.bind_to_tailscale:
+        if not config.network.tailscale_ip:
+            raise RuntimeError(
+                "web.bind_to_tailscale is enabled but network.tailscale.ip_address is not set; "
+                "fill it in after the device joins Tailscale"
+            )
+        return config.network.tailscale_ip
+    return config.web.host or "0.0.0.0"
 
 
 if __name__ == "__main__":

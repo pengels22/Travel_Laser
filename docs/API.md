@@ -6,7 +6,7 @@
 - `POST /api/stop`
 - `POST /api/estop`
 
-The web portal is hosted on `0.0.0.0:8080` and embeds the configured WebRTC camera stream in a simple viewer. If no camera stream URL is configured, it defaults to `http://<current-host>:8889/cam`.
+The web portal is hosted on the configured Tailscale IPv4 address at port `8080` and embeds the configured WebRTC camera stream in a simple viewer. Deployment uses `web.bind_to_tailscale: true`; startup intentionally fails until `network.tailscale.ip_address` is filled in after the Orange Pi joins the tailnet. If no camera stream URL is configured, it defaults to `http://<current-host>:8889/cam`.
 
 ## Local UI
 
@@ -21,7 +21,7 @@ Expected local screens:
 All local touchscreen screens target `480x320` landscape. Do not design portrait/mobile-style panels for the physical display.
 
 - Home: machine state plus two large same-priority controls, `HOME` and `STOP`.
-- Status: GRBL state, LightBurn TCP connection/stream state, Power, E-stop Sense, Safety Relay, and Laser USB connection.
+- Status: GRBL state, LightBurn TCP connection/stream state, Power, E-stop Sense, Safety Relay, Laser USB connection, and Tailscale state.
 - Network: `eth0` connection state with received IP shown below it, `wlan1` selected SSID/state with received IP shown below it, Wi-Fi scan, SSID selection, password prompt, connect, forget, and refresh.
 - Mode: Network vs VirtualHere ownership. Selecting the inactive mode opens a confirmation popup before changing modes.
 - System: display/touch test, diagnostics, service controls, reboot/shutdown.

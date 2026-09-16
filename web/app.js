@@ -12,6 +12,7 @@ function renderStatus(state) {
   setText("estop-sense", state.physical.estop_sense ? "active" : "ok");
   setText("k1", state.physical.k1 ? "on" : "off");
   setText("lightburn", state.lightburn.connected ? "connected" : "disconnected");
+  setText("tailscale", tailscaleLabel(state.network));
   setText("mode", state.mode.laser_mode);
 
   const error = document.getElementById("error");
@@ -23,6 +24,12 @@ function renderStatus(state) {
   }
 
   renderCamera(state.camera);
+}
+
+function tailscaleLabel(network) {
+  if (!network) return "unknown";
+  if (network.tailscale_connected && network.tailscale_ip) return network.tailscale_ip;
+  return network.tailscale_status || "waiting";
 }
 
 function renderCamera(camera) {

@@ -80,8 +80,9 @@ class GPIOConfig:
 
 @dataclass
 class WebConfig:
-    host: str = "0.0.0.0"
+    host: str | None = "0.0.0.0"
     port: int = 8080
+    bind_to_tailscale: bool = False
 
 
 @dataclass
@@ -111,6 +112,9 @@ class LoggingConfig:
 class NetworkConfig:
     uplink_wifi_interface: str = "wlan1"
     ethernet_interface: str = "eth0"
+    tailscale_interface: str = "tailscale0"
+    tailscale_ip: str | None = None
+    tailscale_enabled: bool = True
     ethernet_metric: int = 100
     uplink_wifi_metric: int = 300
     ethernet_preferred: bool = True
@@ -205,7 +209,11 @@ def config_from_dict(raw: dict[str, Any]) -> AppConfig:
             estop_input=_gpio_line(gpio.get("estop_input", {})),
             k1_output=_gpio_line(gpio.get("k1_output", {})),
         ),
-        web=WebConfig(host=str(web.get("host", "0.0.0.0")), port=int(web.get("port", 8080))),
+        web=WebConfig(
+            host=_optional_str(web.get("host", "0.0.0.0")),
+            port=int(web.get("port", 8080)),
+            bind_to_tailscale=_as_bool(web.get("bind_to_tailscale", False)),
+        ),
         fire=FireConfig(
             enabled=_as_bool(fire.get("enabled", False)),
             sensor_enabled=_as_bool(fire.get("sensor_enabled", raw.get("FIRE_SENSOR", False))),
@@ -222,6 +230,9 @@ def config_from_dict(raw: dict[str, Any]) -> AppConfig:
         network=NetworkConfig(
             uplink_wifi_interface=str(network.get("uplink_wifi", {}).get("interface", "wlan1")),
             ethernet_interface=str(network.get("ethernet", {}).get("interface", "eth0")),
+            tailscale_interface=str(network.get("tailscale", {}).get("interface", "tailscale0")),
+            tailscale_ip=_optional_str(network.get("tailscale", {}).get("ip_address")),
+            tailscale_enabled=_as_bool(network.get("tailscale", {}).get("enabled", True)),
             ethernet_metric=int(network.get("ethernet", {}).get("metric", 100)),
             uplink_wifi_metric=int(network.get("uplink_wifi", {}).get("metric", 300)),
             ethernet_preferred=_as_bool(network.get("ethernet_preferred", True)),
@@ -254,6 +265,13 @@ def _optional_int(value: Any) -> int | None:
     if value is None:
         return None
     return int(str(value), 0)
+
+
+def _optional_str(value: Any) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
 
 
 def _as_bool(value: Any) -> bool:

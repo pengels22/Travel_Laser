@@ -75,7 +75,7 @@ class LocalUI:
     def max_scroll(self, screen: ScreenName) -> int:
         content_heights: dict[ScreenName, int] = {
             "home": CONTENT_HEIGHT,
-            "status": 224,
+            "status": 252,
             "net": 258,
             "mode": CONTENT_HEIGHT,
             "system": 252,
@@ -162,6 +162,7 @@ class LocalUI:
             ("E-stop Sense", "OK", GREEN),
             ("Safety Relay", "Engaged", GREEN),
             ("Laser USB", "Connected", GREEN),
+            ("Tailscale", "Waiting", YELLOW),
         )
         y = 58 - scroll_y
         for label, value, color in rows:

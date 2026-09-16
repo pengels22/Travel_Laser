@@ -61,18 +61,21 @@
     <circle class="green" cx="306" cy="21" r="8"/>
     <text class="text small" x="322" y="26">Ready</text>
     <g transform="translate(20 62)">
-      <rect class="panel" width="440" height="188"/>
+      <rect class="panel" width="440" height="196"/>
       <g class="text mid">
-        <text x="18" y="28">GRBL State</text><text x="18" y="58">LightBurn</text><text x="18" y="88">Active Stream</text>
-        <text x="18" y="118">Power</text><text x="18" y="148">E-stop Sense</text><text x="18" y="178">Safety Relay</text>
+        <text x="18" y="26">GRBL State</text><text x="18" y="50">LightBurn</text><text x="18" y="74">Active Stream</text>
+        <text x="18" y="98">Power</text><text x="18" y="122">E-stop Sense</text><text x="18" y="146">Safety Relay</text>
+        <text x="18" y="170">Laser USB</text><text x="18" y="194">Tailscale</text>
       </g>
       <g>
-        <rect class="green" x="265" y="10" width="145" height="24" rx="8"/><text class="pillText" x="319" y="28">Idle</text>
-        <rect class="green" x="265" y="40" width="145" height="24" rx="8"/><text class="pillText" x="300" y="58">Connected</text>
-        <rect class="gray" x="265" y="70" width="145" height="24" rx="8"/><text class="pillText" x="319" y="88">None</text>
-        <rect class="green" x="265" y="100" width="145" height="24" rx="8"/><text class="pillText" x="309" y="118">12V OK</text>
-        <rect class="green" x="265" y="130" width="145" height="24" rx="8"/><text class="pillText" x="323" y="148">OK</text>
-        <rect class="green" x="265" y="160" width="145" height="24" rx="8"/><text class="pillText" x="302" y="178">Engaged</text>
+        <rect class="green" x="265" y="8" width="145" height="20" rx="7"/><text class="pillText" x="319" y="24">Idle</text>
+        <rect class="green" x="265" y="32" width="145" height="20" rx="7"/><text class="pillText" x="300" y="48">Connected</text>
+        <rect class="gray" x="265" y="56" width="145" height="20" rx="7"/><text class="pillText" x="319" y="72">None</text>
+        <rect class="green" x="265" y="80" width="145" height="20" rx="7"/><text class="pillText" x="309" y="96">12V OK</text>
+        <rect class="green" x="265" y="104" width="145" height="20" rx="7"/><text class="pillText" x="323" y="120">OK</text>
+        <rect class="green" x="265" y="128" width="145" height="20" rx="7"/><text class="pillText" x="302" y="144">Engaged</text>
+        <rect class="green" x="265" y="152" width="145" height="20" rx="7"/><text class="pillText" x="300" y="168">Connected</text>
+        <rect class="yellow" x="265" y="176" width="145" height="20" rx="7"/><text class="pillText" x="304" y="192">Waiting</text>
       </g>
     </g>
     <g transform="translate(8 264)">

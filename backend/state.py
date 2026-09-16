@@ -66,7 +66,10 @@ class NetworkState:
     wifi_connected: bool = False
     wifi_ssid: str | None = None
     ip_address: str | None = None
+    tailscale_connected: bool = False
+    tailscale_interface: str = "tailscale0"
     tailscale_ip: str | None = None
+    tailscale_status: str = "not configured"
 
 
 @dataclass

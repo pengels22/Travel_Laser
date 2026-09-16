@@ -106,10 +106,18 @@ network:
   ethernet:
     interface: eth0
     metric: 100
+  tailscale:
+    enabled: true
+    interface: tailscale0
+    # Fill this with the Orange Pi's stable Tailscale IPv4 address after the device joins the tailnet.
+    ip_address: null
   ethernet_preferred: true
 
 web:
-  host: 0.0.0.0
+  # Deployment should listen only on the Tailscale IP, not every interface.
+  # With bind_to_tailscale enabled, startup intentionally fails until network.tailscale.ip_address is set.
+  host: null
+  bind_to_tailscale: true
   port: 8080
 
 logging:

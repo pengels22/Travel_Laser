@@ -148,5 +148,6 @@ The export includes `/var/log/travel-laser` plus recent journals for the control
 - Set `CAMERA_DEVICE` in `systemd/travel-laser-camera.service` to a stable `/dev/v4l/by-id/...` path after the camera is present.
 - Confirm the highest stable camera mode reported by `v4l2-ctl --list-formats-ext`.
 - Confirm the OS device names for SPI1 and I2C3 after enabling them.
+- Fill `network.tailscale.ip_address` with the Orange Pi's stable Tailscale IPv4 address before enabling the deployed web portal.
 - Confirm whether ST7796U userspace SPI is fast enough or whether a kernel DRM/fbdev route is better on the chosen OS image.
 - Confirm the exact VirtualHere service name and whether backend-controlled mode switching should start/stop that service or leave it manual.
