@@ -22,6 +22,12 @@
       .title { font-size: 24px; font-weight: 700; }
       .pillText { font-family: Arial, Helvetica, sans-serif; fill: #ffffff; font-size: 15px; font-weight: 700; }
     </style>
+    <g id="globeIcon" fill="none" stroke="#f2f6fb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="0" cy="0" r="8"/>
+      <path d="M-8 0H8"/>
+      <path d="M0 -8C2 -5.6 3 -3 3 0S2 5.6 0 8"/>
+      <path d="M0 -8C-2 -5.6 -3 -3 -3 0S-2 5.6 0 8"/>
+    </g>
   </defs>
   <rect class="page" width="2520" height="390"/>
 
@@ -40,7 +46,7 @@
     <g transform="translate(8 264)">
       <rect class="blue" width="88" height="48" rx="6"/><text class="text small" x="24" y="30">Home</text>
       <rect class="darkBtn" x="96" width="88" height="48"/><text class="text small" x="113" y="30">Status</text>
-      <rect class="darkBtn" x="192" width="88" height="48"/><text class="text small" x="220" y="30">Net</text>
+      <rect class="darkBtn" x="192" width="88" height="48"/><use href="#globeIcon" x="214" y="24"/><text class="text small" x="230" y="30">Net</text>
       <rect class="darkBtn" x="288" width="80" height="48"/><text class="text small" x="311" y="30">Mode</text>
       <rect class="darkBtn" x="376" width="88" height="48"/><text class="text small" x="395" y="30">System</text>
     </g>
@@ -72,7 +78,7 @@
     <g transform="translate(8 264)">
       <rect class="darkBtn" width="88" height="48"/><text class="text small" x="24" y="30">Home</text>
       <rect class="blue" x="96" width="88" height="48" rx="6"/><text class="text small" x="113" y="30">Status</text>
-      <rect class="darkBtn" x="192" width="88" height="48"/><text class="text small" x="220" y="30">Net</text>
+      <rect class="darkBtn" x="192" width="88" height="48"/><use href="#globeIcon" x="214" y="24"/><text class="text small" x="230" y="30">Net</text>
       <rect class="darkBtn" x="288" width="80" height="48"/><text class="text small" x="311" y="30">Mode</text>
       <rect class="darkBtn" x="376" width="88" height="48"/><text class="text small" x="395" y="30">System</text>
     </g>
@@ -88,24 +94,24 @@
     <text class="text small" x="322" y="26">Ready</text>
     <rect class="panel" x="18" y="56" width="214" height="74"/>
     <text class="text mid" x="34" y="84">Ethernet</text><text class="pillText" x="132" y="84">Connected</text>
-    <text class="muted small" x="34" y="112">IP 192.168.1.42</text>
+    <text class="muted small" x="34" y="112">192.168.1.42</text>
     <rect class="panel" x="248" y="56" width="214" height="74"/>
     <text class="text mid" x="264" y="84">Wi-Fi</text><text class="muted small" x="336" y="84">Workshop</text>
-    <text class="muted small" x="264" y="112">IP 192.168.1.58</text>
+    <text class="muted small" x="264" y="112">192.168.1.58</text>
     <rect class="panel" x="18" y="140" width="444" height="76"/>
     <text class="muted small" x="36" y="164">Available Wi-Fi Networks</text>
     <rect class="blue" x="34" y="174" width="410" height="26" rx="4"/>
     <text class="text small" x="50" y="193">Workshop WiFi</text><text class="text small" x="360" y="193">selected</text>
     <g transform="translate(18 228)">
       <rect class="darkBtn" width="100" height="36"/><text class="text small" x="34" y="23">Scan</text>
-      <rect class="blue" x="112" width="110" height="36" rx="6"/><text class="text small" x="139" y="23">Connect</text>
+      <rect class="darkBtn" x="112" width="110" height="36"/><text class="text small" x="139" y="23">Connect</text>
       <rect class="darkBtn" x="234" width="100" height="36"/><text class="text small" x="263" y="23">Forget</text>
       <rect class="darkBtn" x="346" width="98" height="36"/><text class="text small" x="371" y="23">Refresh</text>
     </g>
     <g transform="translate(8 264)">
       <rect class="darkBtn" width="88" height="48"/><text class="text small" x="24" y="30">Home</text>
       <rect class="darkBtn" x="96" width="88" height="48"/><text class="text small" x="113" y="30">Status</text>
-      <rect class="blue" x="192" width="88" height="48" rx="6"/><text class="text small" x="220" y="30">Net</text>
+      <rect class="blue" x="192" width="88" height="48" rx="6"/><use href="#globeIcon" x="214" y="24"/><text class="text small" x="230" y="30">Net</text>
       <rect class="darkBtn" x="288" width="80" height="48"/><text class="text small" x="311" y="30">Mode</text>
       <rect class="darkBtn" x="376" width="88" height="48"/><text class="text small" x="395" y="30">System</text>
     </g>
@@ -130,7 +136,7 @@
     <g transform="translate(8 264)">
       <rect class="darkBtn" width="88" height="48"/><text class="text small" x="24" y="30">Home</text>
       <rect class="darkBtn" x="96" width="88" height="48"/><text class="text small" x="113" y="30">Status</text>
-      <rect class="darkBtn" x="192" width="88" height="48"/><text class="text small" x="220" y="30">Net</text>
+      <rect class="darkBtn" x="192" width="88" height="48"/><use href="#globeIcon" x="214" y="24"/><text class="text small" x="230" y="30">Net</text>
       <rect class="blue" x="288" width="80" height="48" rx="6"/><text class="text small" x="311" y="30">Mode</text>
       <rect class="darkBtn" x="376" width="88" height="48"/><text class="text small" x="395" y="30">System</text>
     </g>
@@ -152,7 +158,7 @@
     <g transform="translate(8 264)">
       <rect class="darkBtn" width="88" height="48"/><text class="text small" x="24" y="30">Home</text>
       <rect class="darkBtn" x="96" width="88" height="48"/><text class="text small" x="113" y="30">Status</text>
-      <rect class="darkBtn" x="192" width="88" height="48"/><text class="text small" x="220" y="30">Net</text>
+      <rect class="darkBtn" x="192" width="88" height="48"/><use href="#globeIcon" x="214" y="24"/><text class="text small" x="230" y="30">Net</text>
       <rect class="darkBtn" x="288" width="80" height="48"/><text class="text small" x="311" y="30">Mode</text>
       <rect class="blue" x="376" width="88" height="48" rx="6"/><text class="text small" x="395" y="30">System</text>
     </g>

@@ -127,6 +127,18 @@
       .nav .icon {
         font-size: 20px;
         line-height: 1;
+        width: 22px;
+        height: 22px;
+        display: grid;
+        place-items: center;
+      }
+
+      .nav .icon svg {
+        width: 22px;
+        height: 22px;
+        stroke: currentColor;
+        fill: none;
+        stroke-width: 2;
       }
 
       .nav .label {
@@ -258,10 +270,6 @@
         min-height: 42px;
         border-radius: 7px;
         background: #263544;
-      }
-
-      .tool.primary {
-        background: var(--blue);
       }
 
       .mode-grid {
@@ -450,7 +458,7 @@
         <nav class="nav" aria-label="Screen navigation">
           <button data-screen="home"><span class="icon">⌂</span><span class="label">Home</span></button>
           <button data-screen="status"><span class="icon">▥</span><span class="label">Status</span></button>
-          <button data-screen="net"><span class="icon">≋</span><span class="label">Net</span></button>
+          <button data-screen="net"><span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="M3 12h18"></path><path d="M12 3c2.2 2.4 3.3 5.4 3.3 9s-1.1 6.6-3.3 9"></path><path d="M12 3c-2.2 2.4-3.3 5.4-3.3 9s1.1 6.6 3.3 9"></path></svg></span><span class="label">Net</span></button>
           <button data-screen="mode"><span class="icon">◉</span><span class="label">Mode</span></button>
           <button data-screen="system"><span class="icon">☰</span><span class="label">System</span></button>
         </nav>
@@ -527,15 +535,15 @@
         const ssids = ["Workshop WiFi", "TravelLaser-Guest", "Office", "Other..."];
         return `
           <div class="network-grid">
-            <div class="card"><strong>Ethernet</strong><br><span class="muted">Connected</span><br><span class="muted">IP 192.168.1.42</span></div>
-            <div class="card"><strong>Wi-Fi</strong><br><span class="muted">${selectedSsid}</span><br><span class="muted">IP 192.168.1.58</span></div>
+            <div class="card"><strong>Ethernet</strong><br><span class="muted">Connected</span><br><span class="muted">192.168.1.42</span></div>
+            <div class="card"><strong>Wi-Fi</strong><br><span class="muted">${selectedSsid}</span><br><span class="muted">192.168.1.58</span></div>
             <div class="card network-list">
               <strong>Available Wi-Fi Networks</strong>
               ${ssids.map((ssid) => `<button class="ssid ${ssid === selectedSsid ? "selected" : ""}" data-ssid="${ssid}"><span>${ssid}</span><span>${ssid === selectedSsid ? "selected" : "locked"}</span></button>`).join("")}
             </div>
             <div class="toolbar">
               <button class="tool" data-action="scan">Scan</button>
-              <button class="tool primary" data-action="connect">Connect</button>
+              <button class="tool" data-action="connect">Connect</button>
               <button class="tool" data-action="forget">Forget</button>
               <button class="tool" data-action="refresh">Refresh</button>
             </div>
