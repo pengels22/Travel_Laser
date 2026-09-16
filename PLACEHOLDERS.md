@@ -48,4 +48,6 @@ Before services start, these must be known:
 - Do not put secrets or the filled deployment env file in git.
 - The web portal will not fall back to `0.0.0.0` when `web.bind_to_tailscale: true`; missing `TRAVEL_LASER_TAILSCALE_IP` is a deployment blocker by design.
 - The GRBL proxy still listens on TCP port `23` for LightBurn. That is separate from the web portal binding.
+- Network mode opens the matched laser USB device at `115200` baud. If the configured identity matches zero or multiple `/dev/serial/by-id/...` devices, the controller service stays failed until the identity is corrected.
+- Automatic log export is limited to newly added USB filesystem partitions larger than 200 MB; internal disks and whole-disk udev events are ignored.
 - Fire logic remains present but inactive by default because `fire.enabled` and `fire.sensor_enabled` are false.

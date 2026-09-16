@@ -11,6 +11,7 @@ from .grbl_proxy import GrblProxy
 from .logging_setup import EventLogger, configure_logging
 from .mode_manager import ModeManager
 from .safety import SafetyController
+from .serial_device import open_laser_serial
 from .state import ControllerState, LaserMode
 from .virtualhere import VirtualHereService
 from .web_portal import WebPortal
@@ -48,6 +49,7 @@ async def run(config_path: Path | None, mock: bool) -> None:
         state,
         safety,
         port=config.laser.tcp_port,
+        serial_factory=lambda: open_laser_serial(config.laser.usb, config.laser.baud),
         status_poll_interval=config.laser.status_poll_interval_seconds,
     )
     virtualhere = VirtualHereService(
@@ -83,12 +85,21 @@ async def run(config_path: Path | None, mock: bool) -> None:
     LOGGER.info("Travel Laser controller ready in %s mode", restored_mode.value)
 
     stop_event = asyncio.Event()
+    physical_poll_task = asyncio.create_task(_physical_input_loop(safety))
     try:
         await stop_event.wait()
     finally:
+        physical_poll_task.cancel()
+        await asyncio.gather(physical_poll_task, return_exceptions=True)
         await portal.stop()
         await proxy.stop()
         await virtualhere.stop()
+
+
+async def _physical_input_loop(safety: SafetyController) -> None:
+    while True:
+        await asyncio.sleep(0.05)
+        await safety.refresh_physical_inputs()
 
 
 def main() -> None:

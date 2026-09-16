@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import Awaitable, Callable
+from typing import Protocol
 
 from .grbl_parser import parse_error_line, parse_status_line
 from .safety import SafetyController
@@ -35,6 +36,12 @@ class MockSerialEndpoint:
         self.connected = False
 
 
+class SerialEndpoint(Protocol):
+    async def write(self, data: bytes) -> None: ...
+    async def read(self, n: int = 4096) -> bytes: ...
+    async def close(self) -> None: ...
+
+
 class GrblProxy:
     def __init__(
         self,
@@ -42,7 +49,7 @@ class GrblProxy:
         safety: SafetyController,
         host: str = "0.0.0.0",
         port: int = 23,
-        serial_factory: Callable[[], Awaitable[MockSerialEndpoint]] | None = None,
+        serial_factory: Callable[[], Awaitable[SerialEndpoint]] | None = None,
         status_poll_interval: float = 0.25,
     ) -> None:
         self.state = state
@@ -51,11 +58,12 @@ class GrblProxy:
         self.port = port
         self.status_poll_interval = status_poll_interval
         self.serial_factory = serial_factory or self._default_serial_factory
-        self.serial: MockSerialEndpoint | None = None
+        self.serial: SerialEndpoint | None = None
         self.server: asyncio.AbstractServer | None = None
         self.active = False
         self._client_connected = False
         self._poll_task: asyncio.Task | None = None
+        self._serial_read_task: asyncio.Task | None = None
 
     async def start(self) -> None:
         if self.active:
@@ -71,6 +79,7 @@ class GrblProxy:
 
         await self.state.update(mutate)
         self._poll_task = asyncio.create_task(self._status_poll_loop())
+        self._serial_read_task = asyncio.create_task(self._serial_read_loop())
 
     async def stop(self) -> None:
         self.active = False
@@ -78,6 +87,10 @@ class GrblProxy:
             self._poll_task.cancel()
             await asyncio.gather(self._poll_task, return_exceptions=True)
             self._poll_task = None
+        if self._serial_read_task:
+            self._serial_read_task.cancel()
+            await asyncio.gather(self._serial_read_task, return_exceptions=True)
+            self._serial_read_task = None
         if self.server:
             self.server.close()
             await self.server.wait_closed()
@@ -185,7 +198,33 @@ class GrblProxy:
         while True:
             await asyncio.sleep(self.status_poll_interval)
             if self.serial:
-                await self.serial.write(STATUS_QUERY)
+                try:
+                    await self.serial.write(STATUS_QUERY)
+                except Exception as exc:
+                    LOGGER.error("laser serial status poll failed: %s", exc)
+                    await self.safety.handle_laser_usb_disconnected()
+                    return
+
+    async def _serial_read_loop(self) -> None:
+        pending = b""
+        while True:
+            if not self.serial:
+                return
+            try:
+                data = await self.serial.read()
+            except Exception as exc:
+                LOGGER.error("laser serial read failed: %s", exc)
+                await self.safety.handle_laser_usb_disconnected()
+                return
+            if not data:
+                await self.safety.handle_laser_usb_disconnected()
+                return
+            pending += data
+            lines = pending.split(b"\n")
+            pending = lines.pop()
+            for line in lines:
+                await self.handle_serial_line(line.decode(errors="replace").rstrip("\r"))
+                await self.handle_serial_line(line)
 
     async def _default_serial_factory(self) -> MockSerialEndpoint:
         return MockSerialEndpoint()
@@ -195,4 +234,3 @@ class GrblProxy:
         if not stripped or stripped in {b"?", b"!", b"~", b"\x18"}:
             return False
         return True
-

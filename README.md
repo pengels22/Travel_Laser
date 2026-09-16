@@ -101,6 +101,7 @@ Main services:
 
 - GPIO safety service owns K1, the hard E-stop relay output, plus the physical power and E-stop sense inputs.
 - USB manager discovers laser and camera devices by VID, PID, serial, or descriptive fallback.
+- The deployed GRBL proxy discovers the matching stable `/dev/serial/by-id/...` laser path and opens it at `115200` baud; it never assumes `/dev/ttyUSB0`.
 - GRBL proxy exposes the laser to LightBurn as a TCP GRBL device on port `23`.
 - Local UI renders machine controls and hardware status to the Hosyond ST7796U/FT6336U touchscreen.
 - Web portal serves status, WebRTC camera, STOP, and E-STOP controls.
