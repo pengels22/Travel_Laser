@@ -15,6 +15,7 @@ from .input.ft6336_touch import FT6336Touch
 
 IDLE_HOME_TIMEOUT_SECONDS = 20.0
 SCROLL_REDRAW_DELTA_PIXELS = 2
+CONTROL_SCROLL_HOLD_SECONDS = 0.3
 
 
 @dataclass
@@ -23,6 +24,8 @@ class LocalUIRuntime:
     scroll_y: int = 0
     drag_last_y: int | None = None
     drag_moved: bool = False
+    drag_pending_control: bool = False
+    drag_pending_started_at: float = 0.0
 
 
 async def run(config_path: Path | None, display_mode: str, touch_mode: str) -> None:
@@ -70,7 +73,7 @@ async def run(config_path: Path | None, display_mode: str, touch_mode: str) -> N
                 event = await touch.read_event()
                 if event:
                     last_touch_at = asyncio.get_running_loop().time()
-                    if _apply_touch(ui, runtime, event):
+                    if _apply_touch(ui, runtime, event, now=asyncio.get_running_loop().time()):
                         await _draw_screen(display, ui, runtime)
                 elif _should_return_home(
                     current_screen=runtime.screen,
@@ -82,6 +85,8 @@ async def run(config_path: Path | None, display_mode: str, touch_mode: str) -> N
                     runtime.scroll_y = 0
                     runtime.drag_last_y = None
                     runtime.drag_moved = False
+                    runtime.drag_pending_control = False
+                    runtime.drag_pending_started_at = 0.0
                     await _draw_screen(display, ui, runtime)
     finally:
         if touch is not None:
@@ -106,10 +111,12 @@ def _screen_for_touch(ui: LocalUI, event: TouchEvent, current_screen: ScreenName
     return ui.hit_nav(point.x, point.y) or current_screen
 
 
-def _apply_touch(ui: LocalUI, runtime: LocalUIRuntime, event: TouchEvent) -> bool:
+def _apply_touch(ui: LocalUI, runtime: LocalUIRuntime, event: TouchEvent, now: float = 0.0) -> bool:
     if event.kind == "up":
         runtime.drag_last_y = None
         runtime.drag_moved = False
+        runtime.drag_pending_control = False
+        runtime.drag_pending_started_at = 0.0
         return False
     if not event.points:
         return False
@@ -123,18 +130,29 @@ def _apply_touch(ui: LocalUI, runtime: LocalUIRuntime, event: TouchEvent) -> boo
             runtime.scroll_y = 0
             runtime.drag_last_y = None
             runtime.drag_moved = False
+            runtime.drag_pending_control = False
+            runtime.drag_pending_started_at = 0.0
             return changed
         if ui.hit_content_control(runtime.screen, point.x, point.y, runtime.scroll_y):
-            runtime.drag_last_y = None
+            runtime.drag_last_y = point.y
             runtime.drag_moved = False
+            runtime.drag_pending_control = True
+            runtime.drag_pending_started_at = now
             return False
         if CONTENT_TOP <= point.y < CONTENT_BOTTOM:
             runtime.drag_last_y = point.y
             runtime.drag_moved = False
+            runtime.drag_pending_control = False
+            runtime.drag_pending_started_at = 0.0
         return False
 
     if event.kind != "move" or runtime.drag_last_y is None:
         return False
+
+    if runtime.drag_pending_control:
+        if now - runtime.drag_pending_started_at < CONTROL_SCROLL_HOLD_SECONDS:
+            return False
+        runtime.drag_pending_control = False
 
     delta_y = point.y - runtime.drag_last_y
     runtime.drag_last_y = point.y

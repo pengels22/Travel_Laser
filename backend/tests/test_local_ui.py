@@ -62,12 +62,26 @@ def test_touch_drag_scrolls_current_screen() -> None:
     assert runtime.scroll_y > 0
 
 
-def test_touch_down_on_content_button_does_not_start_scroll_drag() -> None:
+def test_touch_down_on_content_button_delays_scroll_drag() -> None:
     ui = LocalUI()
-    runtime = LocalUIRuntime(screen="net", scroll_y=46)
+    runtime = LocalUIRuntime(screen="net", scroll_y=20)
 
-    assert not _apply_touch(ui, runtime, TouchEvent("down", (TouchPoint(0, 150, 249),)))
-    assert runtime.drag_last_y is None
+    assert not _apply_touch(ui, runtime, TouchEvent("down", (TouchPoint(0, 150, 249),)), now=10.0)
+    assert runtime.drag_last_y == 249
+    assert runtime.drag_pending_control
+    assert not _apply_touch(ui, runtime, TouchEvent("move", (TouchPoint(0, 150, 220),)), now=10.2)
+    assert runtime.scroll_y == 20
+
+
+def test_held_content_button_can_start_scroll_drag() -> None:
+    ui = LocalUI()
+    runtime = LocalUIRuntime(screen="net", scroll_y=20)
+
+    _apply_touch(ui, runtime, TouchEvent("down", (TouchPoint(0, 150, 249),)), now=10.0)
+    assert _apply_touch(ui, runtime, TouchEvent("move", (TouchPoint(0, 150, 220),)), now=10.3)
+
+    assert not runtime.drag_pending_control
+    assert runtime.scroll_y > 20
 
 
 def test_touch_drag_is_clamped_at_top() -> None:

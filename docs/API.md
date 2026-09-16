@@ -32,7 +32,7 @@ Offline clickable walkthrough: `docs/ui/local-touchscreen-walkthrough.html`.
 
 The deployed local touchscreen UI uses the same screen order, labels, color roles, control layout, and scroll behavior as the offline walkthrough. The native ST7796U renderer uses a simple framebuffer pixel font, so browser text antialiasing and exact font metrics are not expected to match perfectly.
 
-Any local page content that extends beyond the fixed header/nav viewport must scroll vertically. On hardware, dragging within the content area scrolls the current page while nav taps remain fixed. In the offline walkthrough, the LCD preview is fixed at `480x320` and supports touch-style click-and-drag scrolling in the content area.
+Any local page content that extends beyond the fixed header/nav viewport must scroll vertically. On hardware, dragging within the content area scrolls the current page while nav taps remain fixed. If the drag starts on a button or other control, the scroll gesture arms after a 300 ms hold so quick taps still activate controls. In the offline walkthrough, the LCD preview is fixed at `480x320` and supports the same touch-style click-and-drag scrolling in the content area.
 
 After 20 seconds with no touch input, the deployed local touchscreen and offline walkthrough return to the Home screen. Any open walkthrough modal is closed during that return-home action.
 

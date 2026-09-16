@@ -502,6 +502,7 @@
       const modalBackdrop = document.getElementById("modal-backdrop");
       const modal = document.getElementById("modal");
       const idleHomeTimeoutMs = 20000;
+      const controlScrollHoldMs = 300;
       let currentScreen = "home";
       let selectedSsid = "Workshop WiFi";
       let passwordText = "";
@@ -510,6 +511,8 @@
       let dragStartScrollTop = 0;
       let dragMoved = false;
       let isDraggingContent = false;
+      let dragPendingControl = false;
+      let dragPendingStartedAt = 0;
 
       const screens = {
         home: renderHome,
@@ -768,19 +771,27 @@
 
       function startContentDrag(event) {
         if (event.button !== 0 && event.pointerType === "mouse") return;
-        if (event.target.closest("button, input, textarea, select, a")) return;
         isDraggingContent = true;
+        dragPendingControl = Boolean(event.target.closest("button, input, textarea, select, a"));
+        dragPendingStartedAt = Date.now();
         dragMoved = false;
         dragStartY = event.clientY;
         dragStartScrollTop = content.scrollTop;
-        content.classList.add("dragging");
-        content.setPointerCapture(event.pointerId);
+        if (!dragPendingControl) {
+          content.setPointerCapture(event.pointerId);
+        }
       }
 
       function moveContentDrag(event) {
         if (!isDraggingContent) return;
+        if (dragPendingControl && Date.now() - dragPendingStartedAt < controlScrollHoldMs) return;
+        if (dragPendingControl && !content.hasPointerCapture(event.pointerId)) {
+          content.setPointerCapture(event.pointerId);
+        }
+        dragPendingControl = false;
         const deltaY = event.clientY - dragStartY;
         if (Math.abs(deltaY) > 3) dragMoved = true;
+        if (dragMoved) content.classList.add("dragging");
         content.scrollTop = dragStartScrollTop - deltaY;
         resetIdleTimer();
       }
@@ -788,6 +799,7 @@
       function endContentDrag(event) {
         if (!isDraggingContent) return;
         isDraggingContent = false;
+        dragPendingControl = false;
         content.classList.remove("dragging");
         if (content.hasPointerCapture(event.pointerId)) {
           content.releasePointerCapture(event.pointerId);
