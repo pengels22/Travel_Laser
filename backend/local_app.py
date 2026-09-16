@@ -124,6 +124,10 @@ def _apply_touch(ui: LocalUI, runtime: LocalUIRuntime, event: TouchEvent) -> boo
             runtime.drag_last_y = None
             runtime.drag_moved = False
             return changed
+        if ui.hit_content_control(runtime.screen, point.x, point.y, runtime.scroll_y):
+            runtime.drag_last_y = None
+            runtime.drag_moved = False
+            return False
         if CONTENT_TOP <= point.y < CONTENT_BOTTOM:
             runtime.drag_last_y = point.y
             runtime.drag_moved = False

@@ -768,6 +768,7 @@
 
       function startContentDrag(event) {
         if (event.button !== 0 && event.pointerType === "mouse") return;
+        if (event.target.closest("button, input, textarea, select, a")) return;
         isDraggingContent = true;
         dragMoved = false;
         dragStartY = event.clientY;

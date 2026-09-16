@@ -85,6 +85,46 @@ class LocalUI:
     def clamp_scroll(self, screen: ScreenName, scroll_y: int) -> int:
         return max(0, min(self.max_scroll(screen), scroll_y))
 
+    def hit_content_control(self, screen: ScreenName, x: int, y: int, scroll_y: int = 0) -> str | None:
+        content_y = y + scroll_y
+        if screen == "home":
+            for button in self.home_actions:
+                if _contains(button, x, y):
+                    return button.label.lower()
+            return None
+        if screen == "net":
+            for button in (
+                Button("scan", 18, 260, 100, 36),
+                Button("connect", 130, 260, 110, 36),
+                Button("forget", 252, 260, 100, 36),
+                Button("refresh", 364, 260, 98, 36),
+            ):
+                if _contains(button, x, content_y):
+                    return button.label
+        if screen == "mode":
+            for button in (
+                Button("network", 24, 66, 432, 72),
+                Button("virtualhere", 24, 150, 432, 72),
+            ):
+                if _contains(button, x, content_y):
+                    return button.label
+        if screen == "system":
+            row_y = 70
+            for label in (
+                "gpio",
+                "usb",
+                "spi-i2c",
+                "logs",
+                "export-logs",
+                "restart-services",
+                "reboot",
+                "shutdown",
+            ):
+                if 24 <= x < 456 and row_y <= content_y < row_y + 30:
+                    return label
+                row_y += 30
+        return None
+
     def _draw_shell(self, frame: "RGB565Frame", active_screen: ScreenName, machine_state: str) -> None:
         frame.fill_rect(0, 0, self.width, 44, DARK)
         frame.text(12, 14, "Travel-Laser", WHITE, scale=2)
@@ -280,3 +320,7 @@ class RGB565Frame:
             for col in range(5):
                 if bits & (1 << col):
                     self.fill_rect(x + col * scale, y + row * scale, scale, scale, color)
+
+
+def _contains(button: Button, x: int, y: int) -> bool:
+    return button.x <= x < button.x + button.width and button.y <= y < button.y + button.height

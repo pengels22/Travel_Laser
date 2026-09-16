@@ -30,6 +30,14 @@ def test_local_ui_clamps_scroll_to_screen_content() -> None:
     assert ui.max_scroll("home") == 0
 
 
+def test_local_ui_detects_content_controls_with_scroll_offset() -> None:
+    ui = LocalUI()
+
+    assert ui.hit_content_control("home", 90, 140) == "home"
+    assert ui.hit_content_control("net", 150, 249, scroll_y=46) == "connect"
+    assert ui.hit_content_control("system", 50, 257, scroll_y=52) == "shutdown"
+
+
 def test_touch_down_on_nav_changes_screen() -> None:
     ui = LocalUI()
     event = TouchEvent("down", (TouchPoint(0, 230, 288),))
@@ -52,6 +60,14 @@ def test_touch_drag_scrolls_current_screen() -> None:
     assert _apply_touch(ui, runtime, TouchEvent("move", (TouchPoint(0, 100, 120),)))
 
     assert runtime.scroll_y > 0
+
+
+def test_touch_down_on_content_button_does_not_start_scroll_drag() -> None:
+    ui = LocalUI()
+    runtime = LocalUIRuntime(screen="net", scroll_y=46)
+
+    assert not _apply_touch(ui, runtime, TouchEvent("down", (TouchPoint(0, 150, 249),)))
+    assert runtime.drag_last_y is None
 
 
 def test_touch_drag_is_clamped_at_top() -> None:
