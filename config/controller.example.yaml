@@ -55,11 +55,10 @@ touch:
 
 gpio:
   power_input:
-    # PC14 high means the physical laser power switch is on.
-    # Switch signal is deterministic; do not configure internal pull-up/down bias unless hardware changes.
-    chip: gpiochip0
-    line: 78
-    board_pin: PC14
+    # Optional future input. Unassigned in the current hardware plan.
+    chip: null
+    line: null
+    board_pin: null
     bias: none
     active_high: true
   estop_input:
