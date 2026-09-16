@@ -27,10 +27,23 @@ CONFIG_MAP = {
     "VIRTUALHERE_BACKEND_CONTROLS_SERVICE": ("virtualhere", "backend_controls_service"),
 }
 
-REQUIRED_ENV = ("TRAVEL_LASER_TAILSCALE_IP", "CAMERA_DEVICE")
-REQUIRED_ANY = {
-    "laser USB identity": ("LASER_USB_VID", "LASER_USB_PID", "LASER_USB_SERIAL", "LASER_USB_DESCRIPTION"),
-}
+REQUIRED_ITEMS = (
+    (
+        "Tailscale IP",
+        ("TRAVEL_LASER_TAILSCALE_IP",),
+        "auto-filled by deploy when `tailscale ip -4` works; otherwise run Tailscale setup first",
+    ),
+    (
+        "Camera device",
+        ("CAMERA_DEVICE",),
+        "auto-filled only when exactly one `/dev/v4l/by-id/*` camera is present; otherwise choose manually",
+    ),
+    (
+        "Laser USB identity",
+        ("LASER_USB_VID", "LASER_USB_PID", "LASER_USB_SERIAL", "LASER_USB_DESCRIPTION"),
+        "auto-filled only when exactly one serial USB device is present; otherwise choose the laser controller manually",
+    ),
+)
 
 
 def main() -> None:
@@ -41,14 +54,16 @@ def main() -> None:
     args = parser.parse_args()
 
     values = read_env(args.env)
-    missing = [key for key in REQUIRED_ENV if not values.get(key)]
-    for label, keys in REQUIRED_ANY.items():
-        if not any(values.get(key) for key in keys):
-            missing.append(f"{label} ({', '.join(keys)})")
+    missing = [
+        (label, keys, hint)
+        for label, keys, hint in REQUIRED_ITEMS
+        if not any(values.get(key) for key in keys)
+    ]
     if missing:
-        print("Missing required deployment values:")
-        for key in missing:
-            print(f"  - {key}")
+        print("Missing deployment values:")
+        for label, keys, hint in missing:
+            print(f"  - {label}: {', '.join(keys)}")
+            print(f"    {hint}")
         raise SystemExit(2)
 
     config = yaml.safe_load(args.config.read_text()) or {}

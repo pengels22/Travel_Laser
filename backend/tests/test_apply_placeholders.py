@@ -68,6 +68,9 @@ def test_apply_placeholders_blocks_missing_required_values(tmp_path: Path) -> No
     )
 
     assert result.returncode == 2
+    assert "Missing deployment values" in result.stdout
+    assert "Tailscale IP" in result.stdout
     assert "TRAVEL_LASER_TAILSCALE_IP" in result.stdout
+    assert "Camera device" in result.stdout
     assert "CAMERA_DEVICE" in result.stdout
-    assert "laser USB identity" in result.stdout
+    assert "Laser USB identity" in result.stdout

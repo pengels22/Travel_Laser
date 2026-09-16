@@ -112,7 +112,7 @@ network:
   tailscale:
     enabled: true
     interface: tailscale0
-    # Fill this with the Orange Pi's stable Tailscale IPv4 address after the device joins the tailnet.
+    # scripts/deploy.sh fills this from `tailscale ip -4` after the device joins the tailnet.
     ip_address: null
   ethernet_preferred: true
 

@@ -103,7 +103,7 @@ sudo apt-get install -y curl ffmpeg git gpiod i2c-tools jq libgpiod-dev network-
 sudo scripts/deploy.sh
 ```
 
-On the first run, `scripts/deploy.sh` creates `/etc/travel-laser/deployment.env` if it does not exist and stops so hardware-specific values can be filled in. See `docs/PLACEHOLDERS.md`. Rerun the same deploy script after filling the env file; it applies those values to `/etc/travel-laser/controller.yaml`, configures network metrics, and starts services when `START_SERVICES=true`.
+On the first run, `scripts/deploy.sh` creates `/etc/travel-laser/deployment.env` if it does not exist, auto-fills safe single-device values, and stops only if required hardware choices remain ambiguous. See `docs/PLACEHOLDERS.md`. Rerun the same deploy script after resolving any missing values; it applies them to `/etc/travel-laser/controller.yaml`, configures network metrics, and starts services when `START_SERVICES=true`.
 
 Enable SPI/I2C using the board image tooling, then reboot:
 
@@ -143,11 +143,9 @@ The export includes `/var/log/travel-laser` plus recent journals for the control
 
 ## Remaining Hardware-Dependent Items
 
-- Identify laser USB VID/PID/serial.
-- Identify camera USB VID/PID/serial.
-- Set `CAMERA_DEVICE` in `systemd/travel-laser-camera.service` to a stable `/dev/v4l/by-id/...` path after the camera is present.
-- Confirm the highest stable camera mode reported by `v4l2-ctl --list-formats-ext`.
+- Let `scripts/deploy.sh` auto-fill Tailscale IP, camera path, and laser USB identity where the Orange Pi can identify a single safe candidate.
+- Resolve any ambiguous deployment values listed in `docs/PLACEHOLDERS.md`.
+- Confirm the highest stable camera mode reported by `v4l2-ctl --list-formats-ext` if `highest_available` is unstable.
 - Confirm the OS device names for SPI1 and I2C3 after enabling them.
-- Fill `network.tailscale.ip_address` with the Orange Pi's stable Tailscale IPv4 address before enabling the deployed web portal.
 - Confirm whether ST7796U userspace SPI is fast enough or whether a kernel DRM/fbdev route is better on the chosen OS image.
 - Confirm the exact VirtualHere service name and whether backend-controlled mode switching should start/stop that service or leave it manual.

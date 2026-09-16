@@ -10,7 +10,7 @@ First run:
 sudo scripts/deploy.sh
 ```
 
-If `/etc/travel-laser/deployment.env` does not exist, the script creates it from `config/deployment.env.example` and stops. Fill the values listed in `docs/PLACEHOLDERS.md`, then rerun:
+If `/etc/travel-laser/deployment.env` does not exist, the script creates it from `config/deployment.env.example`, auto-fills safe single-device values, and stops only if required hardware choices remain ambiguous. Resolve anything listed in `docs/PLACEHOLDERS.md`, then rerun:
 
 ```bash
 sudo /opt/travel-laser-controller/scripts/deploy.sh
