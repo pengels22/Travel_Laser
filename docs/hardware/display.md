@@ -69,9 +69,9 @@ Proposed LCD/touch wiring, checked against existing project GPIO use:
 | CTP_SDA | I2C3 SDA | 3 | n/a | `touch.i2c_bus` | OK, verify `/dev/i2c-3` |
 | CTP_SCL | I2C3 SCL | 5 | n/a | `touch.i2c_bus` | OK, verify `/dev/i2c-3` |
 | CTP_RST | PC5 | 13 | 69 | `touch.reset_gpio_line` | OK |
-| CTP_INT | PC11 | 12 | 75 | `touch.interrupt_gpio_line` | OK |
+| CTP_INT | PC11 | 12 | 75 | `touch.interrupt_gpio_line` | Optional; polling works if disconnected |
 
-Do not wire CTP_INT to PC8; PC8 is reserved for the K1 E-stop relay.
+Do not wire CTP_INT to PC8; PC8 is reserved for the K1 E-stop relay. CTP_INT on PC11 is optional. The current FT6336U backend polls over I2C, so touch remains usable and does not fail if CTP_INT is left disconnected.
 
 ## Project Pin Ownership
 
@@ -81,7 +81,7 @@ Do not wire CTP_INT to PC8; PC8 is reserved for the K1 E-stop relay.
 | PC6 | 11 | 70 | LCD D/C |
 | PC8 | 15 | 72 | K1 E-stop relay |
 | PC9 | 7 | 73 | LCD reset |
-| PC11 | 12 | 75 | Touch interrupt |
+| PC11 | 12 | 75 | Optional touch interrupt |
 | PC14 | 18 | 78 | Power sense input |
 | PC15 | 16 | 79 | E-stop power sense input |
 

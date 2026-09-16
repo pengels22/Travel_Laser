@@ -53,7 +53,8 @@ touch:
   # CTP_RST = PC5, Linux GPIO 69, physical pin 13.
   reset_gpio_chip: gpiochip0
   reset_gpio_line: 69
-  # CTP_INT = PC11, Linux GPIO 75, physical pin 12.
+  # Optional CTP_INT = PC11, Linux GPIO 75, physical pin 12.
+  # Touch polling still works if this line is not connected.
   interrupt_gpio_chip: gpiochip0
   interrupt_gpio_line: 75
 

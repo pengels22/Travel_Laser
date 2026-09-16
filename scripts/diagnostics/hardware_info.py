@@ -22,7 +22,7 @@ def main() -> None:
     print(f"display spi_device: {config.display.spi_device}")
     print(f"display dc/reset/backlight: {config.display.dc_gpio_line}/{config.display.reset_gpio_line}/{config.display.backlight_gpio_line}")
     print(f"touch: {config.touch.controller} bus={config.touch.i2c_bus} address=0x{config.touch.i2c_address:02x}")
-    print(f"touch reset/interrupt: {config.touch.reset_gpio_line}/{config.touch.interrupt_gpio_line}")
+    print(f"touch reset/optional interrupt: {config.touch.reset_gpio_line}/{config.touch.interrupt_gpio_line}")
     print("SPI devices:")
     for item in sorted(glob.glob("/dev/spidev*")):
         print(f"  {item}")
