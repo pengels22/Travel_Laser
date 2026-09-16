@@ -48,8 +48,8 @@ touch:
   rotation: 90
   reset_gpio_chip: gpiochip0
   reset_gpio_line: 69
-  interrupt_gpio_chip: null
-  interrupt_gpio_line: null
+  interrupt_gpio_chip: gpiochip0
+  interrupt_gpio_line: 75
 ```
 
 ## Wiring Table
@@ -69,9 +69,9 @@ Proposed LCD/touch wiring, checked against existing project GPIO use:
 | CTP_SDA | I2C3 SDA | 3 | n/a | `touch.i2c_bus` | OK, verify `/dev/i2c-3` |
 | CTP_SCL | I2C3 SCL | 5 | n/a | `touch.i2c_bus` | OK, verify `/dev/i2c-3` |
 | CTP_RST | PC5 | 13 | 69 | `touch.reset_gpio_line` | OK |
-| CTP_INT | PC8 | 15 | 72 | `touch.interrupt_gpio_line` | Conflict: PC8 is K1 relay |
+| CTP_INT | PC11 | 12 | 75 | `touch.interrupt_gpio_line` | OK |
 
-Do not wire CTP_INT to PC8 in the current hardware plan. The FT6336U backend supports polling, so `touch.interrupt_gpio_line` remains `null` until a different interrupt pin is assigned.
+Do not wire CTP_INT to PC8; PC8 is reserved for the K1 E-stop relay.
 
 ## Project Pin Ownership
 
@@ -81,6 +81,7 @@ Do not wire CTP_INT to PC8 in the current hardware plan. The FT6336U backend sup
 | PC6 | 11 | 70 | LCD D/C |
 | PC8 | 15 | 72 | K1 E-stop relay |
 | PC9 | 7 | 73 | LCD reset |
+| PC11 | 12 | 75 | Touch interrupt |
 | PC14 | 18 | 78 | Power sense input |
 | PC15 | 16 | 79 | E-stop power sense input |
 

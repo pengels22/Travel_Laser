@@ -28,7 +28,7 @@ def test_example_config_captures_deployment_defaults():
     assert config.touch.i2c_address == 0x38
     assert config.touch.i2c_bus == 3
     assert config.touch.reset_gpio_line == 69
-    assert config.touch.interrupt_gpio_line is None
+    assert config.touch.interrupt_gpio_line == 75
     assert config.network.ethernet_interface == "eth0"
     assert config.network.ethernet_metric == 100
     assert config.network.uplink_wifi_interface == "wlan1"

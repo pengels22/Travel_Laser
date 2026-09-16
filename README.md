@@ -81,7 +81,7 @@ Target module: Hosyond 3.5-inch IPS capacitive touch LCD, ASIN `B0CMD7Y55M`.
 | RESET | GPIO | GPIO | `display.reset_gpio_line` | PC9 / GPIO 73 / physical pin 7 |
 | Backlight | GPIO | GPIO | `display.backlight_gpio_line` | TODO: choose final pin or tie on |
 | Touch reset | GPIO | GPIO | `touch.reset_gpio_line` | PC5 / GPIO 69 / physical pin 13 |
-| Touch interrupt | GPIO | GPIO | `touch.interrupt_gpio_line` | Not assigned: proposed PC8 conflicts with K1 |
+| Touch interrupt | GPIO | GPIO | `touch.interrupt_gpio_line` | PC11 / GPIO 75 / physical pin 12 |
 
 See `docs/hardware/display.md` for wiring placeholders, driver approach, setup commands, and troubleshooting.
 

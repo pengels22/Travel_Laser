@@ -53,9 +53,9 @@ touch:
   # CTP_RST = PC5, Linux GPIO 69, physical pin 13.
   reset_gpio_chip: gpiochip0
   reset_gpio_line: 69
-  # CTP_INT was proposed on PC8/physical pin 15, but PC8 is already K1. Use polling unless another pin is assigned.
-  interrupt_gpio_chip: null
-  interrupt_gpio_line: null
+  # CTP_INT = PC11, Linux GPIO 75, physical pin 12.
+  interrupt_gpio_chip: gpiochip0
+  interrupt_gpio_line: 75
 
 gpio:
   power_input:
