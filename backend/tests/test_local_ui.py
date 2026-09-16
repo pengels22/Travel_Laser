@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from backend.application.ui import LocalUI
 from backend.input.touch_interface import TouchEvent, TouchPoint
-from backend.local_app import _screen_for_touch, _should_return_home
+from backend.local_app import LocalUIRuntime, _apply_touch, _screen_for_touch, _should_return_home
 
 
 def test_local_ui_renders_all_primary_screens() -> None:
@@ -22,6 +22,14 @@ def test_local_ui_nav_hit_testing() -> None:
     assert ui.hit_nav(20, 20) is None
 
 
+def test_local_ui_clamps_scroll_to_screen_content() -> None:
+    ui = LocalUI()
+
+    assert ui.clamp_scroll("net", 999) == ui.max_scroll("net")
+    assert ui.clamp_scroll("net", -20) == 0
+    assert ui.max_scroll("home") == 0
+
+
 def test_touch_down_on_nav_changes_screen() -> None:
     ui = LocalUI()
     event = TouchEvent("down", (TouchPoint(0, 230, 288),))
@@ -34,6 +42,36 @@ def test_touch_move_does_not_change_screen() -> None:
     event = TouchEvent("move", (TouchPoint(0, 230, 288),))
 
     assert _screen_for_touch(ui, event, "home") == "home"
+
+
+def test_touch_drag_scrolls_current_screen() -> None:
+    ui = LocalUI()
+    runtime = LocalUIRuntime(screen="net")
+
+    assert not _apply_touch(ui, runtime, TouchEvent("down", (TouchPoint(0, 100, 180),)))
+    assert _apply_touch(ui, runtime, TouchEvent("move", (TouchPoint(0, 100, 120),)))
+
+    assert runtime.scroll_y > 0
+
+
+def test_touch_drag_is_clamped_at_top() -> None:
+    ui = LocalUI()
+    runtime = LocalUIRuntime(screen="net")
+
+    _apply_touch(ui, runtime, TouchEvent("down", (TouchPoint(0, 100, 120),)))
+    assert not _apply_touch(ui, runtime, TouchEvent("move", (TouchPoint(0, 100, 180),)))
+
+    assert runtime.scroll_y == 0
+
+
+def test_nav_touch_resets_scroll_for_new_screen() -> None:
+    ui = LocalUI()
+    runtime = LocalUIRuntime(screen="net", scroll_y=25)
+
+    assert _apply_touch(ui, runtime, TouchEvent("down", (TouchPoint(0, 330, 288),)))
+
+    assert runtime.screen == "mode"
+    assert runtime.scroll_y == 0
 
 
 def test_idle_timeout_returns_non_home_screen_home() -> None:

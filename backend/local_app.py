@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+from dataclasses import dataclass
 from pathlib import Path
 
-from .application.ui import LocalUI, ScreenName
+from .application.ui import CONTENT_BOTTOM, CONTENT_TOP, LocalUI, ScreenName
 from .config import load_config
 from .display.desktop_display import DesktopDisplay
 from .display.interface import Display, DisplayConfig
@@ -13,6 +14,15 @@ from .input.touch_interface import TouchEvent
 from .input.ft6336_touch import FT6336Touch
 
 IDLE_HOME_TIMEOUT_SECONDS = 20.0
+SCROLL_REDRAW_DELTA_PIXELS = 2
+
+
+@dataclass
+class LocalUIRuntime:
+    screen: ScreenName = "home"
+    scroll_y: int = 0
+    drag_last_y: int | None = None
+    drag_moved: bool = False
 
 
 async def run(config_path: Path | None, display_mode: str, touch_mode: str) -> None:
@@ -33,8 +43,8 @@ async def run(config_path: Path | None, display_mode: str, touch_mode: str) -> N
     display = DesktopDisplay(display_config) if display_mode == "desktop" else ST7796Display(display_config)
     await display.initialize()
     ui = LocalUI(display.width, display.height)
-    current_screen: ScreenName = "home"
-    await _draw_screen(display, ui, current_screen)
+    runtime = LocalUIRuntime()
+    await _draw_screen(display, ui, runtime)
 
     touch = None
     if touch_mode == "ft6336":
@@ -60,26 +70,33 @@ async def run(config_path: Path | None, display_mode: str, touch_mode: str) -> N
                 event = await touch.read_event()
                 if event:
                     last_touch_at = asyncio.get_running_loop().time()
-                    next_screen = _screen_for_touch(ui, event, current_screen)
-                    if next_screen != current_screen:
-                        current_screen = next_screen
-                        await _draw_screen(display, ui, current_screen)
+                    if _apply_touch(ui, runtime, event):
+                        await _draw_screen(display, ui, runtime)
                 elif _should_return_home(
-                    current_screen=current_screen,
+                    current_screen=runtime.screen,
                     last_touch_at=last_touch_at,
                     now=asyncio.get_running_loop().time(),
                     timeout_seconds=IDLE_HOME_TIMEOUT_SECONDS,
                 ):
-                    current_screen = "home"
-                    await _draw_screen(display, ui, current_screen)
+                    runtime.screen = "home"
+                    runtime.scroll_y = 0
+                    runtime.drag_last_y = None
+                    runtime.drag_moved = False
+                    await _draw_screen(display, ui, runtime)
     finally:
         if touch is not None:
             await touch.close()
         await display.close()
 
 
-async def _draw_screen(display: Display, ui: LocalUI, screen: ScreenName) -> None:
-    await display.draw_rgb565(0, 0, display.width, display.height, ui.render(screen))
+async def _draw_screen(display: Display, ui: LocalUI, runtime: LocalUIRuntime) -> None:
+    await display.draw_rgb565(
+        0,
+        0,
+        display.width,
+        display.height,
+        ui.render(runtime.screen, scroll_y=runtime.scroll_y),
+    )
 
 
 def _screen_for_touch(ui: LocalUI, event: TouchEvent, current_screen: ScreenName) -> ScreenName:
@@ -87,6 +104,44 @@ def _screen_for_touch(ui: LocalUI, event: TouchEvent, current_screen: ScreenName
         return current_screen
     point = event.points[0]
     return ui.hit_nav(point.x, point.y) or current_screen
+
+
+def _apply_touch(ui: LocalUI, runtime: LocalUIRuntime, event: TouchEvent) -> bool:
+    if event.kind == "up":
+        runtime.drag_last_y = None
+        runtime.drag_moved = False
+        return False
+    if not event.points:
+        return False
+
+    point = event.points[0]
+    if event.kind == "down":
+        next_screen = ui.hit_nav(point.x, point.y)
+        if next_screen is not None:
+            changed = next_screen != runtime.screen or runtime.scroll_y != 0
+            runtime.screen = next_screen
+            runtime.scroll_y = 0
+            runtime.drag_last_y = None
+            runtime.drag_moved = False
+            return changed
+        if CONTENT_TOP <= point.y < CONTENT_BOTTOM:
+            runtime.drag_last_y = point.y
+            runtime.drag_moved = False
+        return False
+
+    if event.kind != "move" or runtime.drag_last_y is None:
+        return False
+
+    delta_y = point.y - runtime.drag_last_y
+    runtime.drag_last_y = point.y
+    if abs(delta_y) < SCROLL_REDRAW_DELTA_PIXELS:
+        return False
+
+    next_scroll = ui.clamp_scroll(runtime.screen, runtime.scroll_y - delta_y)
+    changed = next_scroll != runtime.scroll_y
+    runtime.scroll_y = next_scroll
+    runtime.drag_moved = runtime.drag_moved or changed
+    return changed
 
 
 def _should_return_home(

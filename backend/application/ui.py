@@ -17,6 +17,9 @@ GRAY = 0x632C
 MUTED = 0xBDF7
 
 ScreenName = Literal["home", "status", "net", "mode", "system"]
+CONTENT_TOP = 44
+CONTENT_BOTTOM = 264
+CONTENT_HEIGHT = CONTENT_BOTTOM - CONTENT_TOP
 
 
 @dataclass(frozen=True)
@@ -44,19 +47,19 @@ class LocalUI:
             Button("STOP", 256, 82, 196, 142),
         )
 
-    def render(self, screen: ScreenName = "home", machine_state: str = "idle") -> bytes:
+    def render(self, screen: ScreenName = "home", machine_state: str = "idle", scroll_y: int = 0) -> bytes:
         frame = RGB565Frame(self.width, self.height, BLACK)
-        self._draw_shell(frame, screen, machine_state)
         if screen == "home":
             self._draw_home(frame)
         elif screen == "status":
-            self._draw_status(frame)
+            self._draw_status(frame, scroll_y)
         elif screen == "net":
-            self._draw_network(frame)
+            self._draw_network(frame, scroll_y)
         elif screen == "mode":
-            self._draw_mode(frame)
+            self._draw_mode(frame, scroll_y)
         elif screen == "system":
-            self._draw_system(frame)
+            self._draw_system(frame, scroll_y)
+        self._draw_shell(frame, screen, machine_state)
         return bytes(frame.data)
 
     def render_home(self, machine_state: str = "idle") -> bytes:
@@ -68,6 +71,19 @@ class LocalUI:
             if button.x <= x < button.x + button.width and button.y <= y < button.y + button.height:
                 return screen_name
         return None
+
+    def max_scroll(self, screen: ScreenName) -> int:
+        content_heights: dict[ScreenName, int] = {
+            "home": CONTENT_HEIGHT,
+            "status": 224,
+            "net": 258,
+            "mode": CONTENT_HEIGHT,
+            "system": 252,
+        }
+        return max(0, content_heights[screen] - CONTENT_HEIGHT)
+
+    def clamp_scroll(self, screen: ScreenName, scroll_y: int) -> int:
+        return max(0, min(self.max_scroll(screen), scroll_y))
 
     def _draw_shell(self, frame: "RGB565Frame", active_screen: ScreenName, machine_state: str) -> None:
         frame.fill_rect(0, 0, self.width, 44, DARK)
@@ -97,7 +113,7 @@ class LocalUI:
             frame.text(button.x + 54, button.y + 52, button.label, WHITE, scale=3)
         frame.text(176, 244, "Ready to operate", MUTED)
 
-    def _draw_status(self, frame: "RGB565Frame") -> None:
+    def _draw_status(self, frame: "RGB565Frame", scroll_y: int) -> None:
         rows = (
             ("GRBL State", "Idle", GREEN),
             ("LightBurn", "Connected", GREEN),
@@ -107,7 +123,7 @@ class LocalUI:
             ("Safety Relay", "Engaged", GREEN),
             ("Laser USB", "Connected", GREEN),
         )
-        y = 58
+        y = 58 - scroll_y
         for label, value, color in rows:
             frame.fill_rect(20, y, 440, 26, PANEL)
             frame.rect(20, y, 440, 26, GRAY)
@@ -115,64 +131,87 @@ class LocalUI:
             frame.fill_rect(288, y + 4, 142, 18, color)
             frame.text(318, y + 9, value, WHITE)
             y += 28
+        self._draw_scrollbar(frame, "status", scroll_y)
 
-    def _draw_network(self, frame: "RGB565Frame") -> None:
-        frame.fill_rect(18, 56, 214, 74, PANEL)
-        frame.rect(18, 56, 214, 74, GRAY)
-        frame.text(34, 76, "Ethernet", WHITE, scale=2)
-        frame.text(132, 80, "Connected", WHITE)
-        frame.text(34, 108, "192.168.1.42", MUTED)
+    def _draw_network(self, frame: "RGB565Frame", scroll_y: int) -> None:
+        y_offset = -scroll_y
+        frame.fill_rect(18, 56 + y_offset, 214, 74, PANEL)
+        frame.rect(18, 56 + y_offset, 214, 74, GRAY)
+        frame.text(34, 76 + y_offset, "Ethernet", WHITE, scale=2)
+        frame.text(132, 80 + y_offset, "Connected", WHITE)
+        frame.text(34, 108 + y_offset, "192.168.1.42", MUTED)
 
-        frame.fill_rect(248, 56, 214, 74, PANEL)
-        frame.rect(248, 56, 214, 74, GRAY)
-        frame.text(264, 76, "Wi-Fi", WHITE, scale=2)
-        frame.text(336, 80, "Workshop", MUTED)
-        frame.text(264, 108, "192.168.1.58", MUTED)
+        frame.fill_rect(248, 56 + y_offset, 214, 74, PANEL)
+        frame.rect(248, 56 + y_offset, 214, 74, GRAY)
+        frame.text(264, 76 + y_offset, "Wi-Fi", WHITE, scale=2)
+        frame.text(336, 80 + y_offset, "Workshop", MUTED)
+        frame.text(264, 108 + y_offset, "192.168.1.58", MUTED)
 
-        frame.fill_rect(18, 140, 444, 76, PANEL)
-        frame.rect(18, 140, 444, 76, GRAY)
-        frame.text(36, 160, "Available Wi-Fi Networks", MUTED)
-        frame.fill_rect(34, 174, 410, 26, BLUE)
-        frame.text(50, 184, "Workshop WiFi", WHITE)
-        frame.text(360, 184, "selected", WHITE)
+        frame.fill_rect(18, 140 + y_offset, 444, 112, PANEL)
+        frame.rect(18, 140 + y_offset, 444, 112, GRAY)
+        frame.text(36, 160 + y_offset, "Available Wi-Fi Networks", MUTED)
+        networks = ("Workshop WiFi", "TravelLaser-Guest", "Office", "Other...")
+        row_y = 174 + y_offset
+        for index, network in enumerate(networks):
+            color = BLUE if index == 0 else DARK
+            frame.fill_rect(34, row_y, 410, 22, color)
+            frame.text(50, row_y + 8, network, WHITE)
+            frame.text(360, row_y + 8, "selected" if index == 0 else "locked", WHITE)
+            row_y += 24
 
         toolbar = (
-            Button("Scan", 18, 228, 100, 36),
-            Button("Connect", 130, 228, 110, 36),
-            Button("Forget", 252, 228, 100, 36),
-            Button("Refresh", 364, 228, 98, 36),
+            Button("Scan", 18, 260 + y_offset, 100, 36),
+            Button("Connect", 130, 260 + y_offset, 110, 36),
+            Button("Forget", 252, 260 + y_offset, 100, 36),
+            Button("Refresh", 364, 260 + y_offset, 98, 36),
         )
         for button in toolbar:
             frame.fill_rect(button.x, button.y, button.width, button.height, DARK)
             frame.rect(button.x, button.y, button.width, button.height, GRAY)
             frame.text(button.x + 20, button.y + 14, button.label, WHITE)
+        self._draw_scrollbar(frame, "net", scroll_y)
 
-    def _draw_mode(self, frame: "RGB565Frame") -> None:
-        frame.fill_rect(24, 66, 432, 72, PANEL_ALT)
-        frame.rect(24, 66, 432, 72, BLUE)
-        frame.text(56, 94, "Network Mode", WHITE, scale=2)
-        frame.text(56, 118, "USB connected to Orange Pi", MUTED)
+    def _draw_mode(self, frame: "RGB565Frame", scroll_y: int) -> None:
+        y_offset = -scroll_y
+        frame.fill_rect(24, 66 + y_offset, 432, 72, PANEL_ALT)
+        frame.rect(24, 66 + y_offset, 432, 72, BLUE)
+        frame.text(56, 94 + y_offset, "Network Mode", WHITE, scale=2)
+        frame.text(56, 118 + y_offset, "USB connected to Orange Pi", MUTED)
 
-        frame.fill_rect(24, 150, 432, 72, PANEL)
-        frame.rect(24, 150, 432, 72, GRAY)
-        frame.text(56, 178, "VirtualHere Service Mode", WHITE, scale=2)
-        frame.text(56, 202, "USB shared over network", MUTED)
+        frame.fill_rect(24, 150 + y_offset, 432, 72, PANEL)
+        frame.rect(24, 150 + y_offset, 432, 72, GRAY)
+        frame.text(56, 178 + y_offset, "VirtualHere Service Mode", WHITE, scale=2)
+        frame.text(56, 202 + y_offset, "USB shared over network", MUTED)
 
-    def _draw_system(self, frame: "RGB565Frame") -> None:
+    def _draw_system(self, frame: "RGB565Frame", scroll_y: int) -> None:
         items = (
             "GPIO Status",
             "USB Identity",
             "SPI / I2C",
             "View Logs",
+            "Export Logs to USB",
             "Restart Services",
-            "Reboot / Shutdown",
+            "Reboot",
+            "Shutdown",
         )
-        frame.fill_rect(24, 56, 432, 196, PANEL)
-        frame.rect(24, 56, 432, 196, GRAY)
-        y = 82
+        frame.fill_rect(24, 56 - scroll_y, 432, 244, PANEL)
+        frame.rect(24, 56 - scroll_y, 432, 244, GRAY)
+        y = 82 - scroll_y
         for item in items:
             frame.text(48, y, item, WHITE, scale=2)
             y += 30
+        self._draw_scrollbar(frame, "system", scroll_y)
+
+    def _draw_scrollbar(self, frame: "RGB565Frame", screen: ScreenName, scroll_y: int) -> None:
+        max_scroll = self.max_scroll(screen)
+        if max_scroll <= 0:
+            return
+        track_y = CONTENT_TOP + 6
+        track_height = CONTENT_HEIGHT - 12
+        thumb_height = max(24, int(track_height * CONTENT_HEIGHT / (CONTENT_HEIGHT + max_scroll)))
+        thumb_y = track_y + int((track_height - thumb_height) * scroll_y / max_scroll)
+        frame.fill_rect(self.width - 8, track_y, 3, track_height, DARK)
+        frame.fill_rect(self.width - 9, thumb_y, 5, thumb_height, MUTED)
 
 
 class RGB565Frame:
@@ -186,6 +225,8 @@ class RGB565Frame:
         self.data[:] = color.to_bytes(2, "big") * (self.width * self.height)
 
     def fill_rect(self, x: int, y: int, width: int, height: int, color: int) -> None:
+        if width <= 0 or height <= 0:
+            return
         pixel = color.to_bytes(2, "big")
         for row in range(max(0, y), min(self.height, y + height)):
             start = (row * self.width + max(0, x)) * 2

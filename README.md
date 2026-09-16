@@ -56,7 +56,7 @@ Render the local UI to a development framebuffer file:
 open .state/display.ppm
 ```
 
-The offline walkthrough in `docs/ui/local-touchscreen-walkthrough.html` is the browser-review version of the deployed local UI. The native display renderer uses the same screen order, labels, colors, and control layout, with simpler pixel-font drawing for the ST7796U framebuffer.
+The offline walkthrough in `docs/ui/local-touchscreen-walkthrough.html` is the browser-review version of the deployed local UI at the LCD's `480x320` dimensions. The native display renderer uses the same screen order, labels, colors, control layout, and scrollable content behavior, with simpler pixel-font drawing for the ST7796U framebuffer.
 
 GRBL network mode is fixed to TCP port `23` for deployment. On macOS and many Linux systems, binding to port 23 may require elevated privileges; for local development, use a copied config with a high TCP port.
 

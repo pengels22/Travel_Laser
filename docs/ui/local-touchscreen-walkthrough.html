@@ -38,16 +38,17 @@
       }
 
       .shell {
-        width: min(100%, 980px);
+        width: 480px;
+        max-width: calc(100vw - 24px);
         display: grid;
         justify-items: center;
         gap: 14px;
       }
 
       .screen {
-        width: min(100%, 960px);
-        aspect-ratio: 480 / 320;
-        max-height: calc(100vh - 130px);
+        width: 480px;
+        height: 320px;
+        max-width: calc(100vw - 24px);
         background: var(--screen);
         border: 2px solid #5b6775;
         border-radius: 10px;
@@ -89,6 +90,31 @@
       .content {
         height: calc(100% - 98px);
         padding: 16px;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        scrollbar-width: thin;
+        scrollbar-color: var(--muted) transparent;
+        touch-action: pan-y;
+        cursor: grab;
+        -webkit-overflow-scrolling: touch;
+        user-select: none;
+      }
+
+      .content.dragging {
+        cursor: grabbing;
+      }
+
+      .content::-webkit-scrollbar {
+        width: 6px;
+      }
+
+      .content::-webkit-scrollbar-track {
+        background: transparent;
+      }
+
+      .content::-webkit-scrollbar-thumb {
+        background: var(--muted);
+        border-radius: 999px;
       }
 
       .nav {
@@ -228,7 +254,6 @@
         display: grid;
         grid-template-columns: 1fr 1fr;
         gap: 12px;
-        height: 100%;
       }
 
       .card {
@@ -273,7 +298,7 @@
       }
 
       .mode-grid {
-        height: 100%;
+        min-height: 188px;
         display: grid;
         grid-template-columns: 1fr 1fr;
         gap: 16px;
@@ -368,6 +393,9 @@
 
       .modal {
         width: min(78%, 360px);
+        max-height: 296px;
+        overflow-y: auto;
+        overscroll-behavior: contain;
         padding: 20px;
         border-radius: 12px;
         background: #121a23;
@@ -478,6 +506,10 @@
       let selectedSsid = "Workshop WiFi";
       let passwordText = "";
       let lastInputAt = Date.now();
+      let dragStartY = 0;
+      let dragStartScrollTop = 0;
+      let dragMoved = false;
+      let isDraggingContent = false;
 
       const screens = {
         home: renderHome,
@@ -496,11 +528,17 @@
       });
       document.addEventListener("pointerdown", resetIdleTimer);
       document.addEventListener("keydown", resetIdleTimer);
+      content.addEventListener("pointerdown", startContentDrag);
+      content.addEventListener("pointermove", moveContentDrag);
+      content.addEventListener("pointerup", endContentDrag);
+      content.addEventListener("pointercancel", endContentDrag);
+      content.addEventListener("click", suppressClickAfterDrag, true);
       setInterval(returnHomeAfterIdle, 1000);
 
       function showScreen(screen) {
         currentScreen = screen;
         content.innerHTML = screens[screen]();
+        content.scrollTop = 0;
         document.querySelectorAll(".nav button").forEach((button) => {
           button.classList.toggle("active", button.dataset.screen === screen);
         });
@@ -726,6 +764,40 @@
         if (modalBackdrop.classList.contains("open")) closeModal();
         if (currentScreen !== "home") showScreen("home");
         resetIdleTimer();
+      }
+
+      function startContentDrag(event) {
+        if (event.button !== 0 && event.pointerType === "mouse") return;
+        isDraggingContent = true;
+        dragMoved = false;
+        dragStartY = event.clientY;
+        dragStartScrollTop = content.scrollTop;
+        content.classList.add("dragging");
+        content.setPointerCapture(event.pointerId);
+      }
+
+      function moveContentDrag(event) {
+        if (!isDraggingContent) return;
+        const deltaY = event.clientY - dragStartY;
+        if (Math.abs(deltaY) > 3) dragMoved = true;
+        content.scrollTop = dragStartScrollTop - deltaY;
+        resetIdleTimer();
+      }
+
+      function endContentDrag(event) {
+        if (!isDraggingContent) return;
+        isDraggingContent = false;
+        content.classList.remove("dragging");
+        if (content.hasPointerCapture(event.pointerId)) {
+          content.releasePointerCapture(event.pointerId);
+        }
+      }
+
+      function suppressClickAfterDrag(event) {
+        if (!dragMoved) return;
+        event.preventDefault();
+        event.stopPropagation();
+        dragMoved = false;
       }
 
       function openKeyboardModal(title, message, cancelText, confirmText) {
