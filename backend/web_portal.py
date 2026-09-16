@@ -31,7 +31,7 @@ class WebPortal:
     async def start(self) -> None:
         app = web.Application()
         app.router.add_get("/api/status", self._status)
-        app.router.add_post("/api/stop", self._stop)
+        app.router.add_post("/api/home", self._home)
         app.router.add_post("/api/estop", self._estop)
         app.router.add_static("/", self.static_dir, show_index=False, append_version=True)
         self.runner = web.AppRunner(app)
@@ -47,11 +47,15 @@ class WebPortal:
     async def _status(self, _: web.Request) -> web.Response:
         return web.json_response(await self.state.to_dict())
 
-    async def _stop(self, _: web.Request) -> web.Response:
-        await self.proxy.stop_job()
+    async def _home(self, _: web.Request) -> web.Response:
+        accepted = await self.proxy.home()
+        if not accepted:
+            return web.json_response(
+                {"ok": False, "message": "Home is unavailable while the machine is active"},
+                status=409,
+            )
         return web.json_response({"ok": True})
 
     async def _estop(self, _: web.Request) -> web.Response:
         await self.safety.request_estop(EstopSource.WEB, "web portal requested E-stop")
         return web.json_response({"ok": True})
-

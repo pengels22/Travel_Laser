@@ -23,7 +23,7 @@ Implemented:
 - Safety controller for the single K1 hard E-stop relay.
 - Mockable GRBL TCP proxy with realtime command injection.
 - Network vs VirtualHere mode manager with persistent mode file.
-- aiohttp web portal with status, STOP, E-STOP, and camera viewer area.
+- aiohttp web portal with camera viewer, HOME, E-STOP, and compact LASER OK/FAULT status.
 - NetworkManager-backed `wlan0` Wi-Fi scan/connect/forget actions.
 - MediaMTX/FFmpeg WebRTC camera service integration.
 - Display/touch abstraction layer with desktop framebuffer, ST7796U SPI, and FT6336U I2C implementations.
@@ -104,7 +104,7 @@ Main services:
 - The deployed GRBL proxy discovers the matching stable `/dev/serial/by-id/...` laser path and opens it at `115200` baud; it never assumes `/dev/ttyUSB0`.
 - GRBL proxy exposes the laser to LightBurn as a TCP GRBL device on port `23`.
 - Local UI renders machine controls and hardware status to the Hosyond ST7796U/FT6336U touchscreen.
-- Web portal serves status, WebRTC camera, STOP, and E-STOP controls.
+- Web portal serves only the WebRTC camera, HOME, E-STOP, and LASER OK/FAULT status. Hardware detail and diagnostics remain on the local touchscreen.
 - Mode manager enforces exclusive Network vs VirtualHere ownership.
 
 Network mode owns the laser USB serial device. VirtualHere mode is a backup/service path and must not run concurrently with the GRBL proxy. VirtualHere is expected to be installed on the Orange Pi, but configured separately unless `VIRTUALHERE_BACKEND_CONTROLS_SERVICE=true` is deliberately enabled after testing.
@@ -177,7 +177,7 @@ The local UI does not display the camera stream, does not include a file browser
 
 ## Web Portal And Camera
 
-- Web portal: `GET /api/status`, `POST /api/stop`, `POST /api/estop`.
+- Web portal: `GET /api/status` for camera/status refresh, `POST /api/home`, and `POST /api/estop`.
 - Deployment uses `web.bind_to_tailscale: true`; startup intentionally fails until `network.tailscale.ip_address` is known.
 - If no `camera.stream_url` is configured, the portal defaults to `http://<current-host>:8889/cam`.
 - MediaMTX serves WebRTC on port `8889`.

@@ -1,41 +1,23 @@
-async function fetchStatus() {
+async function fetchCameraStatus() {
   const response = await fetch("/api/status");
   if (!response.ok) return;
   const state = await response.json();
-  renderStatus(state);
-}
-
-function renderStatus(state) {
-  setText("machine-state", state.machine.state);
-  setText("homed", String(state.machine.homed));
-  setText("power-sense", state.physical.power_sense ? "present" : "off");
-  setText("estop-sense", state.physical.estop_sense ? "active" : "ok");
-  setText("k1", state.physical.k1 ? "on" : "off");
-  setText("lightburn", state.lightburn.connected ? "connected" : "disconnected");
-  setText("tailscale", tailscaleLabel(state.network));
-  setText("mode", state.mode.laser_mode);
-
-  const error = document.getElementById("error");
-  if (state.machine.error) {
-    error.textContent = state.machine.error;
-    error.hidden = false;
-  } else {
-    error.hidden = true;
-  }
-
+  const laserOk = state.ready &&
+    state.physical.power_sense &&
+    !state.physical.estop_sense &&
+    state.physical.k1 &&
+    state.machine.laser_usb_connected &&
+    state.machine.connected_to_grbl &&
+    !state.safety.software_estop;
+  const status = document.getElementById("laser-status");
+  status.textContent = laserOk ? "LASER OK" : "LASER FAULT";
+  status.className = laserOk ? "ok" : "fault";
   renderCamera(state.camera);
-}
-
-function tailscaleLabel(network) {
-  if (!network) return "unknown";
-  if (network.tailscale_connected && network.tailscale_ip) return network.tailscale_ip;
-  return network.tailscale_status || "waiting";
 }
 
 function renderCamera(camera) {
   const frame = document.getElementById("camera-frame");
   const streamUrl = camera.stream_url || `${window.location.protocol}//${window.location.hostname}:8889/cam`;
-
   if (camera.stream_type === "webrtc") {
     const existing = frame.querySelector("iframe");
     if (existing && existing.src === streamUrl) return;
@@ -57,17 +39,15 @@ function renderCamera(camera) {
   }
 }
 
-function setText(id, value) {
-  document.getElementById(id).textContent = value;
-}
-
 async function post(path) {
-  await fetch(path, { method: "POST" });
-  await fetchStatus();
+  const response = await fetch(path, { method: "POST" });
+  if (!response.ok && path === "/api/home") {
+    window.alert("Home is unavailable while the machine is active.");
+  }
 }
 
-document.getElementById("stop").addEventListener("click", () => post("/api/stop"));
+document.getElementById("home").addEventListener("click", () => post("/api/home"));
 document.getElementById("estop").addEventListener("click", () => post("/api/estop"));
 
-fetchStatus();
-setInterval(fetchStatus, 1000);
+fetchCameraStatus();
+setInterval(fetchCameraStatus, 1000);

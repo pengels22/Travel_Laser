@@ -17,27 +17,23 @@ main {
   padding: 24px;
 }
 
-h1,
 h2 {
   margin: 0 0 16px;
 }
 
-dl {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 12px;
-  margin: 0;
+.laser-status {
+  padding: 16px;
+  text-align: center;
+  font-size: 1.5rem;
+  font-weight: 800;
 }
 
-dt {
-  color: #9ca3af;
-  font-size: 0.8rem;
-  text-transform: uppercase;
+.laser-status .ok {
+  color: #4ade80;
 }
 
-dd {
-  margin: 4px 0 0;
-  font-size: 1.2rem;
+.laser-status .fault {
+  color: #f87171;
 }
 
 .camera {
@@ -79,15 +75,10 @@ button {
   cursor: pointer;
 }
 
-#stop {
-  background: #d97706;
+#home {
+  background: #16a34a;
 }
 
 #estop {
   background: #dc2626;
-}
-
-#error {
-  color: #fecaca;
-  font-weight: 700;
 }
