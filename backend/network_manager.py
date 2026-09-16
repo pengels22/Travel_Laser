@@ -19,7 +19,7 @@ class NetworkInterfaceStatus:
 
 
 class NetworkManager:
-    def __init__(self, uplink_interface: str = "wlan1", dry_run: bool = False) -> None:
+    def __init__(self, uplink_interface: str = "wlan0", dry_run: bool = False) -> None:
         self.uplink_interface = uplink_interface
         self.dry_run = dry_run
         self.actions: list[tuple[str, str, str | None]] = []

@@ -22,7 +22,7 @@ All local touchscreen screens target `480x320` landscape. Do not design portrait
 
 - Home: machine state plus two large same-priority controls, `HOME` and `STOP`.
 - Status: GRBL state, LightBurn TCP connection/stream state, Power, E-stop Sense, Safety Relay, Laser USB connection, and Tailscale state.
-- Network: `eth0` connection state with received IP shown below it, `wlan1` selected SSID/state with received IP shown below it, Wi-Fi scan, SSID selection, password prompt, connect, forget, and refresh.
+- Network: `eth0` connection state with received IP shown below it, `wlan0` selected SSID/state with received IP shown below it, Wi-Fi scan, SSID selection, password prompt, connect, forget, and refresh.
 - Mode: Network vs VirtualHere ownership. Selecting the inactive mode opens a confirmation popup before changing modes.
 - System: display/touch test, diagnostics, service controls, reboot/shutdown.
 
@@ -50,7 +50,7 @@ System subpages:
 
 ## Network Settings
 
-Network settings apply to uplink Wi-Fi on `wlan1`. Ethernet `eth0` remains preferred when both uplinks are connected.
+Network settings apply to uplink Wi-Fi on `wlan0`. Ethernet `eth0` remains preferred when both uplinks are connected.
 
 Touchscreen Wi-Fi flow:
 

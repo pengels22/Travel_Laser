@@ -24,7 +24,7 @@ Implemented:
 - Mockable GRBL TCP proxy with realtime command injection.
 - Network vs VirtualHere mode manager with persistent mode file.
 - aiohttp web portal with status, STOP, E-STOP, and camera viewer area.
-- NetworkManager-backed `wlan1` Wi-Fi scan/connect/forget actions.
+- NetworkManager-backed `wlan0` Wi-Fi scan/connect/forget actions.
 - MediaMTX/FFmpeg WebRTC camera service integration.
 - Display/touch abstraction layer with desktop framebuffer, ST7796U SPI, and FT6336U I2C implementations.
 - Local touchscreen app entry point with Home, Status, Net, Mode, and System screens plus diagnostics utilities.

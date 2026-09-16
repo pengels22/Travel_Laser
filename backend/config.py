@@ -110,7 +110,7 @@ class LoggingConfig:
 
 @dataclass
 class NetworkConfig:
-    uplink_wifi_interface: str = "wlan1"
+    uplink_wifi_interface: str = "wlan0"
     ethernet_interface: str = "eth0"
     tailscale_interface: str = "tailscale0"
     tailscale_ip: str | None = None
@@ -228,7 +228,7 @@ def config_from_dict(raw: dict[str, Any]) -> AppConfig:
             backend_controls_service=_as_bool(virtualhere.get("backend_controls_service", False)),
         ),
         network=NetworkConfig(
-            uplink_wifi_interface=str(network.get("uplink_wifi", {}).get("interface", "wlan1")),
+            uplink_wifi_interface=str(network.get("uplink_wifi", {}).get("interface", "wlan0")),
             ethernet_interface=str(network.get("ethernet", {}).get("interface", "eth0")),
             tailscale_interface=str(network.get("tailscale", {}).get("interface", "tailscale0")),
             tailscale_ip=_optional_str(network.get("tailscale", {}).get("ip_address")),

@@ -3,7 +3,7 @@ from backend.network_manager import _parse_interface_status
 
 def test_parse_interface_status_extracts_ip_and_connection():
     status = _parse_interface_status(
-        "wlan1",
+        "wlan0",
         "\n".join(
             [
                 "GENERAL.STATE:100 (connected)",
@@ -13,7 +13,7 @@ def test_parse_interface_status_extracts_ip_and_connection():
         ),
     )
 
-    assert status.interface == "wlan1"
+    assert status.interface == "wlan0"
     assert status.connected is True
     assert status.ssid == "Workshop WiFi"
     assert status.ip_address == "192.168.1.42"

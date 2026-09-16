@@ -104,7 +104,7 @@ virtualhere:
 network:
   uplink_wifi:
     enabled: true
-    interface: wlan1
+    interface: wlan0
     metric: 300
   ethernet:
     interface: eth0
