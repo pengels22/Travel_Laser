@@ -19,10 +19,19 @@ def main() -> None:
     config = load_config(args.config)
     print("Travel Laser hardware info")
     print(f"display: {config.display.controller} {config.display.width}x{config.display.height} rotation={config.display.rotation}")
-    print(f"display spi_device: {config.display.spi_device}")
-    print(f"display dc/reset/backlight: {config.display.dc_gpio_line}/{config.display.reset_gpio_line}/{config.display.backlight_gpio_line}")
-    print(f"touch: {config.touch.controller} bus={config.touch.i2c_bus} address=0x{config.touch.i2c_address:02x}")
-    print(f"touch reset/optional interrupt: {config.touch.reset_gpio_line}/{config.touch.interrupt_gpio_line}")
+    print(f"SPI1 Linux device candidate: {config.display.spi_device}")
+    print(
+        "H618 gpiochip candidates: "
+        f"LCD_DC={config.display.dc_gpio_chip}:{config.display.dc_gpio_line}, "
+        f"LCD_RST={config.display.reset_gpio_chip}:{config.display.reset_gpio_line}, "
+        f"backlight={config.display.backlight_gpio_chip}:{config.display.backlight_gpio_line}"
+    )
+    print(f"touch: {config.touch.controller} I2C3 bus candidate={config.touch.i2c_bus} address=0x{config.touch.i2c_address:02x}")
+    print(
+        "H618 gpiochip candidates: "
+        f"CTP_RST={config.touch.reset_gpio_chip}:{config.touch.reset_gpio_line}, "
+        f"optional CTP_INT={config.touch.interrupt_gpio_chip}:{config.touch.interrupt_gpio_line}"
+    )
     print("SPI devices:")
     for item in sorted(glob.glob("/dev/spidev*")):
         print(f"  {item}")

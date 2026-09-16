@@ -6,9 +6,20 @@ Known relay meanings:
 
 Known Orange Pi pin assignments:
 
+- PC5: CTP_RST output, Linux GPIO `69`, header pin `13`.
+- PC6: LCD_DC output, Linux GPIO `70`, header pin `11`.
+- PC9: LCD_RST output, Linux GPIO `73`, header pin `7`.
+- PC11: optional CTP_INT input, Linux GPIO `75`, header pin `12`.
 - PC14: power sense input, Linux GPIO `78`, header pin `18`.
 - PC15: E-stop power sense input, Linux GPIO `79`, header pin `16`.
 - PC8: K1 E-stop relay output, Linux GPIO `72`, header pin `15`.
+
+Display/touch buses:
+
+- ST7796U LCD uses SPI1 only: MOSI PH7/pin `19`, MISO PH8/pin `21`, SCK PH6/pin `23`, CS PH9/pin `24`.
+- FT6336U touch uses I2C3 only: SDA PH5/pin `3`, SCL PH4/pin `5`.
+- Do not substitute other SPI/I2C buses automatically.
+- Do not use PC8 for touch interrupt because PC8 is reserved for K1.
 
 Relay polarity:
 
@@ -42,7 +53,7 @@ Fire safety:
 
 GPIO mapping source:
 
-- PC8, PC14, and PC15 are mapped from the Orange Pi Zero 3 official documentation.
+- PC5, PC6, PC8, PC9, PC11, PC14, and PC15 are mapped from the Orange Pi Zero 3 official documentation.
 - Verify with `gpioinfo` on the target Armbian image during install, but the configured default chip is `gpiochip0`.
 
 USB devices must be identified by VID, PID, serial, or descriptive fallback. Do not rely on `/dev/ttyUSB0` or `/dev/video0`.

@@ -6,11 +6,13 @@ This project targets the Hosyond 3.5-inch IPS capacitive touch LCD module, ASIN 
 
 - LCD controller: ST7796U.
 - Touch controller: FT6336U.
+- Orange Pi target: Orange Pi Zero 3 / Allwinner H618.
 - Native portrait resolution: `320x480`.
 - Application orientation: `480x320` landscape.
 - Pixel format: RGB565.
 - Module power: 5 V.
 - GPIO logic: 3.3 V.
+- Never apply 5 V to an Orange Pi GPIO signal pin.
 
 ## Driver Approach
 
@@ -54,24 +56,41 @@ touch:
 
 ## Wiring Table
 
-Proposed LCD/touch wiring, checked against existing project GPIO use:
+Final LCD/touch bus assignment, checked against existing project GPIO use:
 
-| LCD module signal | Orange Pi Zero 3 signal | Header pin | Linux GPIO | Config | Status |
-| --- | --- | ---: | ---: | --- | --- |
-| VCC | 5V | 2 or 4 | n/a | n/a | OK |
-| GND | Ground | 6 | n/a | n/a | OK |
-| LCD_CS | SPI1 CS | 24 | n/a | `display.spi_device` | OK, verify `/dev/spidev1.0` |
-| MOSI / SDI | SPI1 MOSI | 19 | n/a | `display.spi_device` | OK |
-| MISO / SDO | SPI1 MISO | 21 | n/a | `display.spi_device` | OK |
-| SCK / CLK | SPI1 CLK | 23 | n/a | `display.spi_device` | OK |
-| LCD_DC / RS | PC6 | 11 | 70 | `display.dc_gpio_line` | OK |
-| LCD_RST | PC9 | 7 | 73 | `display.reset_gpio_line` | OK |
-| CTP_SDA | I2C3 SDA | 3 | n/a | `touch.i2c_bus` | OK, verify `/dev/i2c-3` |
-| CTP_SCL | I2C3 SCL | 5 | n/a | `touch.i2c_bus` | OK, verify `/dev/i2c-3` |
-| CTP_RST | PC5 | 13 | 69 | `touch.reset_gpio_line` | OK |
-| CTP_INT | PC11 | 12 | 75 | `touch.interrupt_gpio_line` | Optional; polling works if disconnected |
+| LCD module signal | Orange Pi Zero 3 signal | SoC pin | Header pin | Linux GPIO | Config | Status |
+| --- | --- | --- | ---: | ---: | --- | --- |
+| VCC | 5V | n/a | 2 or 4 | n/a | n/a | OK |
+| GND | Ground | n/a | 6 | n/a | n/a | OK |
+| LCD_CS | SPI1 CS | PH9 | 24 | n/a | `display.spi_device` | OK, verify `/dev/spidev1.0` |
+| MOSI / SDI | SPI1 MOSI | PH7 | 19 | n/a | `display.spi_device` | OK |
+| MISO / SDO | SPI1 MISO | PH8 | 21 | n/a | `display.spi_device` | OK |
+| SCK / CLK | SPI1 CLK | PH6 | 23 | n/a | `display.spi_device` | OK |
+| LCD_DC / RS | GPIO | PC6 | 11 | 70 | `display.dc_gpio_line` | OK |
+| LCD_RST | GPIO | PC9 | 7 | 73 | `display.reset_gpio_line` | OK |
+| CTP_SDA | I2C3 SDA | PH5 | 3 | n/a | `touch.i2c_bus` | OK, verify `/dev/i2c-3` |
+| CTP_SCL | I2C3 SCL | PH4 | 5 | n/a | `touch.i2c_bus` | OK, verify `/dev/i2c-3` |
+| CTP_RST | GPIO | PC5 | 13 | 69 | `touch.reset_gpio_line` | OK |
+| CTP_INT | GPIO | PC11 | 12 | 75 | `touch.interrupt_gpio_line` | Optional; polling works if disconnected |
 
 Do not wire CTP_INT to PC8; PC8 is reserved for the K1 E-stop relay. CTP_INT on PC11 is optional. The current FT6336U backend polls over I2C, so touch remains usable and does not fail if CTP_INT is left disconnected.
+
+## Bus Assignment Rules
+
+1. Use SPI1 only for the ST7796U display.
+2. Use I2C3 only for the FT6336U touch controller.
+3. Do not bit-bang SPI or I2C.
+4. Use the Linux SPI subsystem for SPI1.
+5. Use the Linux I2C subsystem for I2C3.
+6. Use libgpiod for LCD_RST, LCD_DC, CTP_RST, and optional CTP_INT.
+7. Keep the gpiochip device configurable.
+8. Keep the SPI1 device path configurable until verified on the running OS.
+9. Keep the I2C3 bus number configurable until verified on the running OS.
+10. Do not substitute SPI0, SPI2, I2C0, I2C1, or another bus automatically.
+11. Do not use Raspberry Pi BCM GPIO numbering.
+12. All Orange Pi GPIO signal lines are 3.3 V.
+13. Display VCC is 5 V.
+14. Never apply 5 V to an Orange Pi GPIO signal pin.
 
 ## Project Pin Ownership
 
@@ -106,11 +125,14 @@ sudo reboot
 Verify buses and GPIO after reboot:
 
 ```bash
+gpiodetect
+gpioinfo
 ls /dev/spidev*
 ls /dev/i2c-*
-gpioinfo
 i2cdetect -l
 ```
+
+The application diagnostics should log which Linux device nodes correspond to SPI1, I2C3, and the main H618 gpiochip. Do not assume `/dev/spidevX.Y` or `/dev/i2c-X` numbering until verified on the actual Orange Pi Zero 3 OS image.
 
 Scan the selected I2C bus after wiring touch:
 

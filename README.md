@@ -85,8 +85,8 @@ Target module: Hosyond 3.5-inch IPS capacitive touch LCD, ASIN `B0CMD7Y55M`.
 
 | Module function | Driver | Bus | Config key | Status |
 | --- | --- | --- | --- | --- |
-| LCD | ST7796U | SPI1 | `display.spi_device` | SPI1 CS/MOSI/MISO/CLK on pins 24/19/21/23, verify `/dev/spidev1.0` |
-| Touch | FT6336U | I2C3 | `touch.i2c_bus`, `touch.i2c_address` | I2C3 SDA/SCL on pins 3/5, verify `/dev/i2c-3` |
+| LCD | ST7796U | SPI1 | `display.spi_device` | SPI1 CS/MOSI/MISO/CLK on PH9/PH7/PH8/PH6, pins 24/19/21/23, verify `/dev/spidev1.0` |
+| Touch | FT6336U | I2C3 | `touch.i2c_bus`, `touch.i2c_address` | I2C3 SDA/SCL on PH5/PH4, pins 3/5, verify `/dev/i2c-3` |
 | D/C | GPIO | GPIO | `display.dc_gpio_line` | PC6 / GPIO 70 / physical pin 11 |
 | RESET | GPIO | GPIO | `display.reset_gpio_line` | PC9 / GPIO 73 / physical pin 7 |
 | Backlight | GPIO | GPIO | `display.backlight_gpio_line` | Pending: choose final pin or tie on |
