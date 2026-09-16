@@ -55,6 +55,8 @@ class TouchHardwareConfig:
     controller: str = "FT6336U"
     i2c_bus: int | None = None
     i2c_address: int = 0x38
+    reset_gpio_chip: str | None = None
+    reset_gpio_line: int | None = None
     interrupt_gpio_chip: str | None = None
     interrupt_gpio_line: int | None = None
     rotation: int = 90
@@ -192,6 +194,8 @@ def config_from_dict(raw: dict[str, Any]) -> AppConfig:
             controller=str(touch.get("controller", "FT6336U")),
             i2c_bus=_optional_int(touch.get("i2c_bus")),
             i2c_address=int(str(touch.get("i2c_address", "0x38")), 0),
+            reset_gpio_chip=touch.get("reset_gpio_chip"),
+            reset_gpio_line=_optional_int(touch.get("reset_gpio_line")),
             interrupt_gpio_chip=touch.get("interrupt_gpio_chip"),
             interrupt_gpio_line=_optional_int(touch.get("interrupt_gpio_line")),
             rotation=int(touch.get("rotation", display.get("rotation", 90))),

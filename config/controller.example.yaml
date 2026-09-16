@@ -32,25 +32,29 @@ display:
   width: 480
   height: 320
   rotation: 90
-  # TODO: confirm Orange Pi SPI device after enabling SPI.
-  spi_device: null
+  # SPI1 CS on physical pin 24. Verify the OS exposes this as /dev/spidev1.0 after enabling SPI1.
+  spi_device: /dev/spidev1.0
   spi_speed_hz: 24000000
-  # TODO: choose and wire 3.3 V GPIO lines for D/C, RESET, and optional backlight.
+  # LCD_DC/RS = PC6, Linux GPIO 70, physical pin 11.
   dc_gpio_chip: gpiochip0
-  dc_gpio_line: null
+  dc_gpio_line: 70
+  # LCD_RST = PC9, Linux GPIO 73, physical pin 7.
   reset_gpio_chip: gpiochip0
-  reset_gpio_line: null
-  backlight_gpio_chip: gpiochip0
+  reset_gpio_line: 73
+  backlight_gpio_chip: null
   backlight_gpio_line: null
 
 touch:
   controller: FT6336U
-  # TODO: confirm Orange Pi I2C bus after enabling I2C.
-  i2c_bus: null
+  # CTP_SDA/SCL on I2C3, physical pins 3/5. Verify the OS exposes this as /dev/i2c-3.
+  i2c_bus: 3
   i2c_address: 0x38
   rotation: 90
-  # TODO: wire interrupt GPIO only if needed; polling fallback is supported.
-  interrupt_gpio_chip: gpiochip0
+  # CTP_RST = PC5, Linux GPIO 69, physical pin 13.
+  reset_gpio_chip: gpiochip0
+  reset_gpio_line: 69
+  # CTP_INT was proposed on PC8/physical pin 15, but PC8 is already K1. Use polling unless another pin is assigned.
+  interrupt_gpio_chip: null
   interrupt_gpio_line: null
 
 gpio:

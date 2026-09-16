@@ -3,7 +3,10 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from backend.config import load_config
 from backend.input.ft6336_touch import FT6336Touch
@@ -22,6 +25,8 @@ async def main() -> None:
         width=config.display.width,
         height=config.display.height,
         rotation=config.touch.rotation,
+        reset_gpio_chip=config.touch.reset_gpio_chip,
+        reset_gpio_line=config.touch.reset_gpio_line,
     )
     await touch.initialize()
     print("Touch test running. Press Ctrl+C to exit.")
@@ -36,4 +41,3 @@ async def main() -> None:
 
 if __name__ == "__main__":
     asyncio.run(main())
-

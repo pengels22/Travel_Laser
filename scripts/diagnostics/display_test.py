@@ -3,7 +3,10 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from backend.config import load_config
 from backend.display.desktop_display import DesktopDisplay
@@ -55,4 +58,3 @@ async def draw_grid(display) -> None:
 
 if __name__ == "__main__":
     asyncio.run(main())
-

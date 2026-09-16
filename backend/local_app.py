@@ -42,6 +42,8 @@ async def run(config_path: Path | None, display_mode: str, touch_mode: str) -> N
             width=display.width,
             height=display.height,
             rotation=config.touch.rotation,
+            reset_gpio_chip=config.touch.reset_gpio_chip,
+            reset_gpio_line=config.touch.reset_gpio_line,
         )
         await touch.initialize()
 
@@ -72,4 +74,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

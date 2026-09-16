@@ -14,6 +14,8 @@ class FT6336Touch:
         height: int = 320,
         rotation: int = 90,
         poll_interval: float = 0.03,
+        reset_gpio_chip: str | None = None,
+        reset_gpio_line: int | None = None,
     ) -> None:
         self.i2c_bus = i2c_bus
         self.address = address
@@ -21,12 +23,17 @@ class FT6336Touch:
         self.height = height
         self.rotation = rotation
         self.poll_interval = poll_interval
+        self.reset_gpio_chip = reset_gpio_chip
+        self.reset_gpio_line = reset_gpio_line
         self._bus = None
+        self._reset_chip = None
+        self._reset_line = None
         self._was_down = False
 
     async def initialize(self) -> None:
         from smbus2 import SMBus
 
+        await self._hardware_reset()
         self._bus = SMBus(self.i2c_bus)
         await asyncio.sleep(0)
 
@@ -53,6 +60,20 @@ class FT6336Touch:
         if self._bus is not None:
             self._bus.close()
 
+    async def _hardware_reset(self) -> None:
+        if self.reset_gpio_line is None:
+            return
+        import gpiod
+
+        chip_name = self.reset_gpio_chip or "gpiochip0"
+        self._reset_chip = gpiod.Chip(chip_name)
+        self._reset_line = self._reset_chip.get_line(self.reset_gpio_line)
+        self._reset_line.request(consumer="travel-laser-touch", type=gpiod.LINE_REQ_DIR_OUT, default_vals=[1])
+        self._reset_line.set_value(0)
+        await asyncio.sleep(0.01)
+        self._reset_line.set_value(1)
+        await asyncio.sleep(0.1)
+
     def _transform(self, raw_x: int, raw_y: int) -> tuple[int, int]:
         if self.rotation == 90:
             x = raw_y
@@ -67,4 +88,3 @@ class FT6336Touch:
             x = raw_x
             y = raw_y
         return max(0, min(self.width - 1, x)), max(0, min(self.height - 1, y))
-

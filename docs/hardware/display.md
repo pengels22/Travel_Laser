@@ -32,41 +32,57 @@ display:
   width: 480
   height: 320
   rotation: 90
-  spi_device: null
+  spi_device: /dev/spidev1.0
   spi_speed_hz: 24000000
   dc_gpio_chip: gpiochip0
-  dc_gpio_line: null
+  dc_gpio_line: 70
   reset_gpio_chip: gpiochip0
-  reset_gpio_line: null
-  backlight_gpio_chip: gpiochip0
+  reset_gpio_line: 73
+  backlight_gpio_chip: null
   backlight_gpio_line: null
 
 touch:
   controller: FT6336U
-  i2c_bus: null
+  i2c_bus: 3
   i2c_address: 0x38
   rotation: 90
-  interrupt_gpio_chip: gpiochip0
+  reset_gpio_chip: gpiochip0
+  reset_gpio_line: 69
+  interrupt_gpio_chip: null
   interrupt_gpio_line: null
 ```
 
 ## Wiring Table
 
-Final Orange Pi header pins are intentionally TBD until the display is physically wired and the enabled buses are confirmed.
+Proposed LCD/touch wiring, checked against existing project GPIO use:
 
-| Module signal | Orange Pi signal | Config key | Status |
-| --- | --- | --- | --- |
-| 5V | 5V | n/a | TODO |
-| GND | GND | n/a | TODO |
-| LCD SCK | SPI SCLK | `display.spi_device` | TODO |
-| LCD MOSI/SDA | SPI MOSI | `display.spi_device` | TODO |
-| LCD CS | SPI CS | `display.spi_device` or GPIO if split later | TODO |
-| LCD D/C | GPIO | `display.dc_gpio_line` | TODO |
-| LCD RESET | GPIO | `display.reset_gpio_line` | TODO |
-| LCD BL | GPIO or 3.3 V enable | `display.backlight_gpio_line` | TODO |
-| Touch SDA | I2C SDA | `touch.i2c_bus` | TODO |
-| Touch SCL | I2C SCL | `touch.i2c_bus` | TODO |
-| Touch INT | GPIO | `touch.interrupt_gpio_line` | Optional TODO |
+| LCD module signal | Orange Pi Zero 3 signal | Header pin | Linux GPIO | Config | Status |
+| --- | --- | ---: | ---: | --- | --- |
+| VCC | 5V | 2 or 4 | n/a | n/a | OK |
+| GND | Ground | 6 | n/a | n/a | OK |
+| LCD_CS | SPI1 CS | 24 | n/a | `display.spi_device` | OK, verify `/dev/spidev1.0` |
+| MOSI / SDI | SPI1 MOSI | 19 | n/a | `display.spi_device` | OK |
+| MISO / SDO | SPI1 MISO | 21 | n/a | `display.spi_device` | OK |
+| SCK / CLK | SPI1 CLK | 23 | n/a | `display.spi_device` | OK |
+| LCD_DC / RS | PC6 | 11 | 70 | `display.dc_gpio_line` | OK |
+| LCD_RST | PC9 | 7 | 73 | `display.reset_gpio_line` | OK |
+| CTP_SDA | I2C3 SDA | 3 | n/a | `touch.i2c_bus` | OK, verify `/dev/i2c-3` |
+| CTP_SCL | I2C3 SCL | 5 | n/a | `touch.i2c_bus` | OK, verify `/dev/i2c-3` |
+| CTP_RST | PC5 | 13 | 69 | `touch.reset_gpio_line` | OK |
+| CTP_INT | PC8 | 15 | 72 | `touch.interrupt_gpio_line` | Conflict: PC8 is K1 relay |
+
+Do not wire CTP_INT to PC8 in the current hardware plan. The FT6336U backend supports polling, so `touch.interrupt_gpio_line` remains `null` until a different interrupt pin is assigned.
+
+## Project Pin Ownership
+
+| Orange Pi pin | Header pin | Linux GPIO | Owner |
+| --- | ---: | ---: | --- |
+| PC5 | 13 | 69 | Touch reset |
+| PC6 | 11 | 70 | LCD D/C |
+| PC8 | 15 | 72 | K1 E-stop relay |
+| PC9 | 7 | 73 | LCD reset |
+| PC14 | 18 | 78 | Power sense input |
+| PC15 | 16 | 79 | E-stop power sense input |
 
 ## Orange Pi Setup
 

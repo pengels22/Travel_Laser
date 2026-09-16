@@ -75,12 +75,13 @@ Target module: Hosyond 3.5-inch IPS capacitive touch LCD, ASIN `B0CMD7Y55M`.
 
 | Module function | Driver | Bus | Config key | Status |
 | --- | --- | --- | --- | --- |
-| LCD | ST7796U | SPI | `display.spi_device` | TODO: confirm final Orange Pi SPI device |
-| Touch | FT6336U | I2C | `touch.i2c_bus`, `touch.i2c_address` | TODO: confirm final Orange Pi I2C bus |
-| D/C | GPIO | GPIO | `display.dc_gpio_line` | TODO: choose final pin |
-| RESET | GPIO | GPIO | `display.reset_gpio_line` | TODO: choose final pin |
+| LCD | ST7796U | SPI1 | `display.spi_device` | SPI1 CS/MOSI/MISO/CLK on pins 24/19/21/23, verify `/dev/spidev1.0` |
+| Touch | FT6336U | I2C3 | `touch.i2c_bus`, `touch.i2c_address` | I2C3 SDA/SCL on pins 3/5, verify `/dev/i2c-3` |
+| D/C | GPIO | GPIO | `display.dc_gpio_line` | PC6 / GPIO 70 / physical pin 11 |
+| RESET | GPIO | GPIO | `display.reset_gpio_line` | PC9 / GPIO 73 / physical pin 7 |
 | Backlight | GPIO | GPIO | `display.backlight_gpio_line` | TODO: choose final pin or tie on |
-| Touch interrupt | GPIO | GPIO | `touch.interrupt_gpio_line` | Optional TODO |
+| Touch reset | GPIO | GPIO | `touch.reset_gpio_line` | PC5 / GPIO 69 / physical pin 13 |
+| Touch interrupt | GPIO | GPIO | `touch.interrupt_gpio_line` | Not assigned: proposed PC8 conflicts with K1 |
 
 See `docs/hardware/display.md` for wiring placeholders, driver approach, setup commands, and troubleshooting.
 
@@ -126,6 +127,6 @@ i2cdetect -l
 - Identify camera USB VID/PID/serial.
 - Set `CAMERA_DEVICE` in `systemd/travel-laser-camera.service` to a stable `/dev/v4l/by-id/...` path after the camera is present.
 - Confirm the highest stable camera mode reported by `v4l2-ctl --list-formats-ext`.
-- Confirm exact SPI device, I2C bus, and GPIO lines for the Hosyond display/touch module.
+- Confirm the OS device names for SPI1 and I2C3 after enabling them.
 - Confirm whether ST7796U userspace SPI is fast enough or whether a kernel DRM/fbdev route is better on the chosen OS image.
 - Confirm the exact VirtualHere service name and whether backend-controlled mode switching should start/stop that service or leave it manual.
