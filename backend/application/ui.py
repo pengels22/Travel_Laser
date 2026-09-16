@@ -25,12 +25,16 @@ class LocalUI:
     def __init__(self, width: int = 480, height: int = 320) -> None:
         self.width = width
         self.height = height
-        self.buttons = (
-            Button("STATUS", 8, 264, 88, 48),
-            Button("HOME", 104, 264, 88, 48),
+        self.nav_buttons = (
+            Button("HOME", 8, 264, 88, 48),
+            Button("STATUS", 104, 264, 88, 48),
             Button("NET", 200, 264, 88, 48),
             Button("MODE", 296, 264, 80, 48),
-            Button("STOP", 384, 264, 88, 48),
+            Button("SYSTEM", 384, 264, 88, 48),
+        )
+        self.home_actions = (
+            Button("HOME", 28, 82, 196, 142),
+            Button("STOP", 256, 82, 196, 142),
         )
 
     def render_home(self, machine_state: str = "offline") -> bytes:
@@ -39,15 +43,18 @@ class LocalUI:
         frame.text(12, 14, "Travel-Laser", WHITE)
         frame.text(340, 14, machine_state.upper(), GREEN if machine_state == "idle" else YELLOW)
 
-        frame.text(24, 88, "Operator panel", WHITE)
-        frame.text(24, 128, "Use HOME to home GRBL", WHITE)
-        frame.text(24, 168, "Use STATUS for IO detail", WHITE)
-
-        for button in self.buttons:
-            color = RED if button.label == "STOP" else GREEN if button.label == "HOME" else BLUE
+        for button in self.home_actions:
+            color = RED if button.label == "STOP" else GREEN
             frame.fill_rect(button.x, button.y, button.width, button.height, color)
             frame.rect(button.x, button.y, button.width, button.height, WHITE)
-            frame.text(button.x + 12, button.y + 18, button.label, WHITE)
+            frame.text(button.x + 74, button.y + 48, button.label, WHITE)
+            frame.text(button.x + 38, button.y + 84, "GRBL" if button.label == "HOME" else "HOLD", WHITE)
+
+        for button in self.nav_buttons:
+            color = BLUE if button.label == "HOME" else DARK
+            frame.fill_rect(button.x, button.y, button.width, button.height, color)
+            frame.rect(button.x, button.y, button.width, button.height, WHITE)
+            frame.text(button.x + 10, button.y + 18, button.label, WHITE)
         return bytes(frame.data)
 
 

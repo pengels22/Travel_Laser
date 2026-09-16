@@ -18,11 +18,13 @@ travel-laser-ui --config /etc/travel-laser/controller.yaml --display st7796 --to
 
 Expected local screens:
 
-- Home: machine state, Home command, Status, Network, Mode, and Stop controls.
+- Home: machine state plus two large same-priority controls, `HOME` and `STOP`.
 - Status: LightBurn TCP connection/stream state, PC14 power sense, PC15 E-stop sense, K1 relay, laser USB connection, and GRBL state.
 - Network: `eth0`, `wlan1`, IP address, Wi-Fi scan/connect/forget.
 - Mode: Network vs VirtualHere ownership.
-- Settings/System: display/touch test, diagnostics, service controls, reboot/shutdown.
+- System: display/touch test, diagnostics, service controls, reboot/shutdown.
+
+Bottom navigation order is fixed as `Home`, `Status`, `Net`, `Mode`, `System`. `STOP` is not a navigation tab; it is a large Home-screen action.
 
 The local UI does not display the camera stream; camera viewing is web UI only. The local UI does not include a file browser or local job launcher. Jobs always originate from the external computer through LightBurn/GRBL. The local UI also must not depend on LightBurn-only metadata such as file name, job name, layer names, previews, or estimated time remaining.
 
