@@ -63,7 +63,7 @@ async def run(config_path: Path | None, mock: bool) -> None:
         safety,
         proxy,
         static_dir=Path(__file__).resolve().parent.parent / "web",
-        host=_resolve_web_host(config),
+        host=_resolve_web_host(config, allow_unset_tailscale=mock),
         port=config.web.port,
     )
 
@@ -99,9 +99,11 @@ def main() -> None:
     asyncio.run(run(args.config, args.mock))
 
 
-def _resolve_web_host(config: AppConfig) -> str:
+def _resolve_web_host(config: AppConfig, allow_unset_tailscale: bool = False) -> str:
     if config.web.bind_to_tailscale:
         if not config.network.tailscale_ip:
+            if allow_unset_tailscale:
+                return "127.0.0.1"
             raise RuntimeError(
                 "web.bind_to_tailscale is enabled but network.tailscale.ip_address is not set; "
                 "fill it in after the device joins Tailscale"

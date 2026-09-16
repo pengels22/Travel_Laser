@@ -89,7 +89,7 @@ Target module: Hosyond 3.5-inch IPS capacitive touch LCD, ASIN `B0CMD7Y55M`.
 | Touch | FT6336U | I2C3 | `touch.i2c_bus`, `touch.i2c_address` | I2C3 SDA/SCL on pins 3/5, verify `/dev/i2c-3` |
 | D/C | GPIO | GPIO | `display.dc_gpio_line` | PC6 / GPIO 70 / physical pin 11 |
 | RESET | GPIO | GPIO | `display.reset_gpio_line` | PC9 / GPIO 73 / physical pin 7 |
-| Backlight | GPIO | GPIO | `display.backlight_gpio_line` | TODO: choose final pin or tie on |
+| Backlight | GPIO | GPIO | `display.backlight_gpio_line` | Pending: choose final pin or tie on |
 | Touch reset | GPIO | GPIO | `touch.reset_gpio_line` | PC5 / GPIO 69 / physical pin 13 |
 | Touch interrupt | GPIO | GPIO | `touch.interrupt_gpio_line` | Optional PC11 / GPIO 75 / physical pin 12; touch falls back to polling |
 
@@ -100,10 +100,10 @@ See `docs/hardware/display.md` for wiring placeholders, driver approach, setup c
 ```bash
 sudo apt-get update
 sudo apt-get install -y curl ffmpeg git gpiod i2c-tools jq libgpiod-dev network-manager python3-dev python3-libgpiod python3-pip python3-smbus python3-venv rsync v4l-utils
-sudo scripts/install.sh
-sudo scripts/configure-network.sh
-sudo systemctl start mediamtx.service travel-laser-camera.service travel-laser-controller.service travel-laser-ui.service
+sudo scripts/deploy.sh
 ```
+
+On the first run, `scripts/deploy.sh` creates `/etc/travel-laser/deployment.env` if it does not exist and stops so hardware-specific values can be filled in. See `docs/PLACEHOLDERS.md`. Rerun the same deploy script after filling the env file; it applies those values to `/etc/travel-laser/controller.yaml`, configures network metrics, and starts services when `START_SERVICES=true`.
 
 Enable SPI/I2C using the board image tooling, then reboot:
 

@@ -1,8 +1,20 @@
 # Install
 
-Deployment scaffolding is in `scripts/install.sh` and `systemd/`.
+Deployment scaffolding is in `scripts/deploy.sh`, `scripts/install.sh`, and `systemd/`.
 
-The install script is intended for an Orange Pi, not for development Macs. It creates config/state/log directories, installs Python/system packages, installs MediaMTX, installs service units, and does not overwrite an existing controller config.
+The deploy and install scripts are intended for an Orange Pi, not for development Macs. The deploy script runs the installer, creates config/state/log directories, installs Python/system packages, installs MediaMTX, installs service units, applies hardware placeholders, configures network metrics, and starts services only after required placeholders are set.
+
+First run:
+
+```bash
+sudo scripts/deploy.sh
+```
+
+If `/etc/travel-laser/deployment.env` does not exist, the script creates it from `config/deployment.env.example` and stops. Fill the values listed in `docs/PLACEHOLDERS.md`, then rerun:
+
+```bash
+sudo /opt/travel-laser-controller/scripts/deploy.sh
+```
 
 VirtualHere is expected to be installed on the Orange Pi, but configured separately.
 

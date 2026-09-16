@@ -8,9 +8,9 @@ Type=simple
 User=travel-laser
 Group=travel-laser
 WorkingDirectory=/opt/travel-laser-controller
-Environment=CAMERA_DEVICE=
 Environment=CAMERA_RESOLUTION=highest_available
 Environment=CAMERA_FPS=30
+EnvironmentFile=-/etc/travel-laser/deployment.env
 ExecStart=/opt/travel-laser-controller/scripts/start-camera-webrtc.sh
 Restart=on-failure
 RestartSec=3

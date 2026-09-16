@@ -75,6 +75,12 @@ def test_web_host_requires_tailscale_ip_when_tailscale_only():
         raise AssertionError("expected Tailscale-only web binding to require an IP")
 
 
+def test_mock_web_host_allows_missing_tailscale_ip_on_loopback():
+    config = config_from_dict({"web": {"bind_to_tailscale": True}, "network": {"tailscale": {"ip_address": None}}})
+
+    assert _resolve_web_host(config, allow_unset_tailscale=True) == "127.0.0.1"
+
+
 def test_example_config_has_no_gpio_line_overlaps():
     config = load_config(Path("config/controller.example.yaml"))
     assigned = {
