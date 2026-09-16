@@ -60,6 +60,7 @@ python3 -m venv .venv
 .venv/bin/python -m pip install -e .
 
 scripts/install-mediamtx.sh
+scripts/disable-power-services.sh
 
 cp systemd/travel-laser-controller.service /etc/systemd/system/travel-laser-controller.service
 cp systemd/travel-laser-camera.service /etc/systemd/system/travel-laser-camera.service

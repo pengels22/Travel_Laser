@@ -122,6 +122,13 @@ The intended deployment uses normal uplink networking only. There is no private 
 - The web portal binds only to the configured Tailscale IPv4 address on port `8080`.
 - `scripts/configure-network.sh` applies route metrics for `eth0` and `wlan0` with `nmcli`.
 
+Power-service defaults:
+
+- Bluetooth is disabled and masked by default.
+- Common non-networking background services are disabled when present: Avahi/mDNS discovery, CUPS printing, BRLTTY, and ModemManager.
+- NetworkManager, Ethernet, Wi-Fi, SSH, Tailscale, MediaMTX, and Travel-Laser services are left enabled.
+- `scripts/disable-power-services.sh` performs this cleanup during deploy and ignores services that are not installed on the OS image.
+
 LightBurn setup:
 
 - Mode: Network mode.

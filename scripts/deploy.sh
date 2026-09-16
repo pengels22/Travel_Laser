@@ -19,6 +19,7 @@ if [[ "${SOURCE_DIR}" != "${APP_DIR}" ]]; then
   "${SOURCE_DIR}/scripts/install.sh"
 else
   echo "Running from ${APP_DIR}; skipping install sync step."
+  "${SOURCE_DIR}/scripts/disable-power-services.sh"
 fi
 
 if [[ ! -f "${DEPLOY_ENV}" ]]; then
