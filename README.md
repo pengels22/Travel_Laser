@@ -27,7 +27,7 @@ Implemented:
 - NetworkManager-backed `wlan1` Wi-Fi scan/connect/forget actions.
 - MediaMTX/FFmpeg WebRTC camera service integration.
 - Display/touch abstraction layer with desktop framebuffer, ST7796U SPI, and FT6336U I2C implementations.
-- Local touchscreen app entry point and diagnostics utilities.
+- Local touchscreen app entry point with Home, Status, Net, Mode, and System screens plus diagnostics utilities.
 - Automatic USB log export when a filesystem flash drive larger than 200 MB is inserted.
 - LightBurn TCP/GRBL setup documentation in `docs/LIGHTBURN.md`.
 
@@ -55,6 +55,8 @@ Render the local UI to a development framebuffer file:
 .venv/bin/travel-laser-ui --config config/controller.example.yaml --display desktop --touch none
 open .state/display.ppm
 ```
+
+The offline walkthrough in `docs/ui/local-touchscreen-walkthrough.html` is the browser-review version of the deployed local UI. The native display renderer uses the same screen order, labels, colors, and control layout, with simpler pixel-font drawing for the ST7796U framebuffer.
 
 GRBL network mode is fixed to TCP port `23` for deployment. On macOS and many Linux systems, binding to port 23 may require elevated privileges; for local development, use a copied config with a high TCP port.
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Literal
 
 
 BLACK = 0x0000
@@ -10,6 +11,12 @@ GREEN = 0x07E0
 BLUE = 0x001F
 YELLOW = 0xFFE0
 DARK = 0x2104
+PANEL = 0x18E4
+PANEL_ALT = 0x2946
+GRAY = 0x632C
+MUTED = 0xBDF7
+
+ScreenName = Literal["home", "status", "net", "mode", "system"]
 
 
 @dataclass(frozen=True)
@@ -26,36 +33,146 @@ class LocalUI:
         self.width = width
         self.height = height
         self.nav_buttons = (
-            Button("HOME", 8, 264, 88, 48),
-            Button("STATUS", 104, 264, 88, 48),
-            Button("NET", 200, 264, 88, 48),
-            Button("MODE", 296, 264, 80, 48),
-            Button("SYSTEM", 384, 264, 88, 48),
+            Button("Home", 8, 264, 88, 48),
+            Button("Status", 104, 264, 88, 48),
+            Button("Net", 200, 264, 88, 48),
+            Button("Mode", 296, 264, 80, 48),
+            Button("System", 384, 264, 88, 48),
         )
         self.home_actions = (
             Button("HOME", 28, 82, 196, 142),
             Button("STOP", 256, 82, 196, 142),
         )
 
-    def render_home(self, machine_state: str = "offline") -> bytes:
+    def render(self, screen: ScreenName = "home", machine_state: str = "idle") -> bytes:
         frame = RGB565Frame(self.width, self.height, BLACK)
-        frame.fill_rect(0, 0, self.width, 44, DARK)
-        frame.text(12, 14, "Travel-Laser", WHITE)
-        frame.text(340, 14, machine_state.upper(), GREEN if machine_state == "idle" else YELLOW)
+        self._draw_shell(frame, screen, machine_state)
+        if screen == "home":
+            self._draw_home(frame)
+        elif screen == "status":
+            self._draw_status(frame)
+        elif screen == "net":
+            self._draw_network(frame)
+        elif screen == "mode":
+            self._draw_mode(frame)
+        elif screen == "system":
+            self._draw_system(frame)
+        return bytes(frame.data)
 
+    def render_home(self, machine_state: str = "idle") -> bytes:
+        return self.render("home", machine_state)
+
+    def hit_nav(self, x: int, y: int) -> ScreenName | None:
+        screen_names: tuple[ScreenName, ...] = ("home", "status", "net", "mode", "system")
+        for screen_name, button in zip(screen_names, self.nav_buttons, strict=True):
+            if button.x <= x < button.x + button.width and button.y <= y < button.y + button.height:
+                return screen_name
+        return None
+
+    def _draw_shell(self, frame: "RGB565Frame", active_screen: ScreenName, machine_state: str) -> None:
+        frame.fill_rect(0, 0, self.width, 44, DARK)
+        frame.text(12, 14, "Travel-Laser", WHITE, scale=2)
+        frame.fill_circle(272, 21, 6, GREEN if machine_state == "idle" else YELLOW)
+        frame.text(286, 14, "Ready" if machine_state == "idle" else machine_state.title(), WHITE)
+
+        for button, screen_name in zip(
+            self.nav_buttons,
+            ("home", "status", "net", "mode", "system"),
+            strict=True,
+        ):
+            color = BLUE if screen_name == active_screen else DARK
+            frame.fill_rect(button.x, button.y, button.width, button.height, color)
+            frame.rect(button.x, button.y, button.width, button.height, GRAY)
+            if screen_name == "net":
+                frame.globe(button.x + 18, button.y + 24, WHITE)
+                frame.text(button.x + 34, button.y + 19, button.label, WHITE)
+            else:
+                frame.text(button.x + 12, button.y + 19, button.label, WHITE)
+
+    def _draw_home(self, frame: "RGB565Frame") -> None:
         for button in self.home_actions:
             color = RED if button.label == "STOP" else GREEN
             frame.fill_rect(button.x, button.y, button.width, button.height, color)
-            frame.rect(button.x, button.y, button.width, button.height, WHITE)
-            frame.text(button.x + 74, button.y + 48, button.label, WHITE)
-            frame.text(button.x + 38, button.y + 84, "GRBL" if button.label == "HOME" else "HOLD", WHITE)
+            frame.rect(button.x, button.y, button.width, button.height, GRAY)
+            frame.text(button.x + 54, button.y + 52, button.label, WHITE, scale=3)
+        frame.text(176, 244, "Ready to operate", MUTED)
 
-        for button in self.nav_buttons:
-            color = BLUE if button.label == "HOME" else DARK
-            frame.fill_rect(button.x, button.y, button.width, button.height, color)
-            frame.rect(button.x, button.y, button.width, button.height, WHITE)
-            frame.text(button.x + 10, button.y + 18, button.label, WHITE)
-        return bytes(frame.data)
+    def _draw_status(self, frame: "RGB565Frame") -> None:
+        rows = (
+            ("GRBL State", "Idle", GREEN),
+            ("LightBurn", "Connected", GREEN),
+            ("Active Stream", "None", GRAY),
+            ("Power", "12V OK", GREEN),
+            ("E-stop Sense", "OK", GREEN),
+            ("Safety Relay", "Engaged", GREEN),
+            ("Laser USB", "Connected", GREEN),
+        )
+        y = 58
+        for label, value, color in rows:
+            frame.fill_rect(20, y, 440, 26, PANEL)
+            frame.rect(20, y, 440, 26, GRAY)
+            frame.text(34, y + 9, label, WHITE)
+            frame.fill_rect(288, y + 4, 142, 18, color)
+            frame.text(318, y + 9, value, WHITE)
+            y += 28
+
+    def _draw_network(self, frame: "RGB565Frame") -> None:
+        frame.fill_rect(18, 56, 214, 74, PANEL)
+        frame.rect(18, 56, 214, 74, GRAY)
+        frame.text(34, 76, "Ethernet", WHITE, scale=2)
+        frame.text(132, 80, "Connected", WHITE)
+        frame.text(34, 108, "192.168.1.42", MUTED)
+
+        frame.fill_rect(248, 56, 214, 74, PANEL)
+        frame.rect(248, 56, 214, 74, GRAY)
+        frame.text(264, 76, "Wi-Fi", WHITE, scale=2)
+        frame.text(336, 80, "Workshop", MUTED)
+        frame.text(264, 108, "192.168.1.58", MUTED)
+
+        frame.fill_rect(18, 140, 444, 76, PANEL)
+        frame.rect(18, 140, 444, 76, GRAY)
+        frame.text(36, 160, "Available Wi-Fi Networks", MUTED)
+        frame.fill_rect(34, 174, 410, 26, BLUE)
+        frame.text(50, 184, "Workshop WiFi", WHITE)
+        frame.text(360, 184, "selected", WHITE)
+
+        toolbar = (
+            Button("Scan", 18, 228, 100, 36),
+            Button("Connect", 130, 228, 110, 36),
+            Button("Forget", 252, 228, 100, 36),
+            Button("Refresh", 364, 228, 98, 36),
+        )
+        for button in toolbar:
+            frame.fill_rect(button.x, button.y, button.width, button.height, DARK)
+            frame.rect(button.x, button.y, button.width, button.height, GRAY)
+            frame.text(button.x + 20, button.y + 14, button.label, WHITE)
+
+    def _draw_mode(self, frame: "RGB565Frame") -> None:
+        frame.fill_rect(24, 66, 432, 72, PANEL_ALT)
+        frame.rect(24, 66, 432, 72, BLUE)
+        frame.text(56, 94, "Network Mode", WHITE, scale=2)
+        frame.text(56, 118, "USB connected to Orange Pi", MUTED)
+
+        frame.fill_rect(24, 150, 432, 72, PANEL)
+        frame.rect(24, 150, 432, 72, GRAY)
+        frame.text(56, 178, "VirtualHere Service Mode", WHITE, scale=2)
+        frame.text(56, 202, "USB shared over network", MUTED)
+
+    def _draw_system(self, frame: "RGB565Frame") -> None:
+        items = (
+            "GPIO Status",
+            "USB Identity",
+            "SPI / I2C",
+            "View Logs",
+            "Restart Services",
+            "Reboot / Shutdown",
+        )
+        frame.fill_rect(24, 56, 432, 196, PANEL)
+        frame.rect(24, 56, 432, 196, GRAY)
+        y = 82
+        for item in items:
+            frame.text(48, y, item, WHITE, scale=2)
+            y += 30
 
 
 class RGB565Frame:
@@ -81,16 +198,44 @@ class RGB565Frame:
         self.fill_rect(x, y, 1, height, color)
         self.fill_rect(x + width - 1, y, 1, height, color)
 
-    def text(self, x: int, y: int, text: str, color: int) -> None:
+    def fill_circle(self, cx: int, cy: int, radius: int, color: int) -> None:
+        for y in range(cy - radius, cy + radius + 1):
+            for x in range(cx - radius, cx + radius + 1):
+                if (x - cx) ** 2 + (y - cy) ** 2 <= radius**2:
+                    self.fill_rect(x, y, 1, 1, color)
+
+    def circle(self, cx: int, cy: int, radius: int, color: int) -> None:
+        outer = radius**2
+        inner = (radius - 1) ** 2
+        for y in range(cy - radius, cy + radius + 1):
+            for x in range(cx - radius, cx + radius + 1):
+                distance = (x - cx) ** 2 + (y - cy) ** 2
+                if inner <= distance <= outer:
+                    self.fill_rect(x, y, 1, 1, color)
+
+    def line_h(self, x: int, y: int, width: int, color: int) -> None:
+        self.fill_rect(x, y, width, 1, color)
+
+    def line_v(self, x: int, y: int, height: int, color: int) -> None:
+        self.fill_rect(x, y, 1, height, color)
+
+    def globe(self, cx: int, cy: int, color: int) -> None:
+        self.circle(cx, cy, 8, color)
+        self.line_h(cx - 8, cy, 16, color)
+        self.line_v(cx, cy - 8, 16, color)
+        self.line_v(cx - 4, cy - 6, 12, color)
+        self.line_v(cx + 4, cy - 6, 12, color)
+
+    def text(self, x: int, y: int, text: str, color: int, scale: int = 1) -> None:
         cursor = x
         for char in text[:32]:
-            self._glyph(cursor, y, char, color)
-            cursor += 8
+            self._glyph(cursor, y, char, color, scale)
+            cursor += 8 * scale
 
-    def _glyph(self, x: int, y: int, char: str, color: int) -> None:
+    def _glyph(self, x: int, y: int, char: str, color: int, scale: int) -> None:
         code = ord(char)
         for row in range(7):
             bits = ((code << row) ^ (code >> (row % 3))) & 0x1F
             for col in range(5):
                 if bits & (1 << col):
-                    self.fill_rect(x + col, y + row, 1, 1, color)
+                    self.fill_rect(x + col * scale, y + row * scale, scale, scale, color)

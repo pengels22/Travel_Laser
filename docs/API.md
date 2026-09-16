@@ -30,6 +30,10 @@ Bottom navigation order is fixed as `Home`, `Status`, `Net`, `Mode`, `System`. `
 
 Offline clickable walkthrough: `docs/ui/local-touchscreen-walkthrough.html`.
 
+The deployed local touchscreen UI uses the same screen order, labels, color roles, and control layout as the offline walkthrough. The native ST7796U renderer uses a simple framebuffer pixel font, so browser text antialiasing and exact font metrics are not expected to match perfectly.
+
+After 20 seconds with no touch input, the deployed local touchscreen and offline walkthrough return to the Home screen. Any open walkthrough modal is closed during that return-home action.
+
 The local UI does not display the camera stream; camera viewing is web UI only. The local UI does not include a file browser or local job launcher. Jobs always originate from the external computer through LightBurn/GRBL. The local UI also must not depend on LightBurn-only metadata such as file name, job name, layer names, previews, or estimated time remaining.
 
 Any text entry on the local touchscreen must open an on-screen keyboard. This includes Wi-Fi passwords and any future editable settings. The UI must not assume a physical keyboard.

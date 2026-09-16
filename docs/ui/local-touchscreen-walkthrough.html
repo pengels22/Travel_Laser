@@ -473,9 +473,11 @@
       const content = document.getElementById("content");
       const modalBackdrop = document.getElementById("modal-backdrop");
       const modal = document.getElementById("modal");
+      const idleHomeTimeoutMs = 20000;
       let currentScreen = "home";
       let selectedSsid = "Workshop WiFi";
       let passwordText = "";
+      let lastInputAt = Date.now();
 
       const screens = {
         home: renderHome,
@@ -492,6 +494,9 @@
       document.querySelectorAll(".nav button").forEach((button) => {
         button.addEventListener("click", () => showScreen(button.dataset.screen));
       });
+      document.addEventListener("pointerdown", resetIdleTimer);
+      document.addEventListener("keydown", resetIdleTimer);
+      setInterval(returnHomeAfterIdle, 1000);
 
       function showScreen(screen) {
         currentScreen = screen;
@@ -710,6 +715,17 @@
 
       function closeModal() {
         modalBackdrop.classList.remove("open");
+      }
+
+      function resetIdleTimer() {
+        lastInputAt = Date.now();
+      }
+
+      function returnHomeAfterIdle() {
+        if (Date.now() - lastInputAt < idleHomeTimeoutMs) return;
+        if (modalBackdrop.classList.contains("open")) closeModal();
+        if (currentScreen !== "home") showScreen("home");
+        resetIdleTimer();
       }
 
       function openKeyboardModal(title, message, cancelText, confirmText) {
