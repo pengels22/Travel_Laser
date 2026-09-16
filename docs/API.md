@@ -22,7 +22,7 @@ All local touchscreen screens target `480x320` landscape. Do not design portrait
 
 - Home: machine state plus two large same-priority controls, `HOME` and `STOP`.
 - Status: GRBL state, LightBurn TCP connection/stream state, Power, E-stop Sense, Safety Relay, and Laser USB connection.
-- Network: `eth0`, `wlan1`, IP address, Wi-Fi scan, SSID selection, password prompt, connect, forget, and refresh.
+- Network: `eth0` connection state and received IP, `wlan1` selected SSID/state and received IP, Wi-Fi scan, SSID selection, password prompt, connect, forget, and refresh.
 - Mode: Network vs VirtualHere ownership. Selecting the inactive mode opens a confirmation popup before changing modes.
 - System: display/touch test, diagnostics, service controls, reboot/shutdown.
 

@@ -529,6 +529,8 @@
           <div class="network-grid">
             <div class="card"><strong>Ethernet</strong><br><span class="muted">Connected</span></div>
             <div class="card"><strong>Wi-Fi</strong><br><span class="muted">${selectedSsid}</span></div>
+            <div class="card"><strong>Ethernet IP</strong><br><span class="muted">192.168.1.42</span></div>
+            <div class="card"><strong>Wi-Fi IP</strong><br><span class="muted">192.168.1.58</span></div>
             <div class="card network-list">
               <strong>Available Wi-Fi Networks</strong>
               ${ssids.map((ssid) => `<button class="ssid ${ssid === selectedSsid ? "selected" : ""}" data-ssid="${ssid}"><span>${ssid}</span><span>${ssid === selectedSsid ? "selected" : "locked"}</span></button>`).join("")}

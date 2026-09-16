@@ -6,6 +6,7 @@ from backend.config import config_from_dict, load_config
 def test_example_config_captures_deployment_defaults():
     config = load_config(Path("config/controller.example.yaml"))
     assert config.controller.hostname == "Travel-Laser"
+    assert config.laser.tcp_port == 23
     assert config.laser.baud == 115200
     assert config.camera.stream_type == "webrtc"
     assert config.camera.resolution == "highest_available"

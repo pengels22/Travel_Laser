@@ -4,6 +4,8 @@ The GRBL proxy listens on TCP port `23` in deployment and allows one LightBurn c
 
 The proxy should remain transparent and conservative around GRBL alarm/error/status strings.
 
+LightBurn should connect to the Travel-Laser IP address shown on the local touchscreen Network page, using TCP port `23`. See `LIGHTBURN.md` for setup notes.
+
 Realtime injections:
 
 - Pause: `!`

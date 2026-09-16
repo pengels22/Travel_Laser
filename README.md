@@ -9,6 +9,8 @@ LightBurn -> TCP port 23 -> Orange Pi GRBL proxy -> USB serial -> laser controll
 Orange Pi -> SPI ST7796U display + I2C FT6336U touch -> local 480x320 UI
 ```
 
+LightBurn connects to the Travel-Laser IP address shown on the local touchscreen Network page using GRBL/TCP port `23`.
+
 Service mode remains available through VirtualHere, but the GRBL proxy and VirtualHere must never own the laser USB device at the same time.
 
 ## Current Status
@@ -27,6 +29,7 @@ Implemented:
 - Display/touch abstraction layer with desktop framebuffer, ST7796U SPI, and FT6336U I2C implementations.
 - Local touchscreen app entry point and diagnostics utilities.
 - Automatic USB log export when a filesystem flash drive larger than 200 MB is inserted.
+- LightBurn TCP/GRBL setup documentation in `docs/LIGHTBURN.md`.
 
 The Orange Pi touchscreen is a local control/status panel only. Camera viewing is web UI only, and the project does not expect LightBurn-specific metadata such as file name, job name, layer names, artwork preview, or estimated time remaining. The Pi does not store or launch local job files; jobs always originate from the external computer through LightBurn/GRBL.
 

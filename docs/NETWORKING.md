@@ -7,5 +7,6 @@ The intended deployment uses normal uplink networking only. There is no private 
 - Ethernet uses `eth0` with route metric `100`.
 - `eth0` is preferred over `wlan1` when both uplinks are connected.
 - Remote browser access is expected through Tailscale.
+- The local touchscreen Network screen shows the received IP address for both `eth0` and `wlan1`. Use that IP address for LightBurn's GRBL/TCP connection on port `23`.
 
 `scripts/configure-network.sh` applies route metrics for `eth0` and `wlan1` with `nmcli`.
