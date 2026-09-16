@@ -18,6 +18,8 @@ travel-laser-ui --config /etc/travel-laser/controller.yaml --display st7796 --to
 
 Expected local screens:
 
+All local touchscreen screens target `480x320` landscape. Do not design portrait/mobile-style panels for the physical display.
+
 - Home: machine state plus two large same-priority controls, `HOME` and `STOP`.
 - Status: GRBL state, LightBurn TCP connection/stream state, Power, E-stop Sense, Safety Relay, and Laser USB connection.
 - Network: `eth0`, `wlan1`, IP address, Wi-Fi scan, SSID selection, password prompt, connect, forget, and refresh.
@@ -25,6 +27,8 @@ Expected local screens:
 - System: display/touch test, diagnostics, service controls, reboot/shutdown.
 
 Bottom navigation order is fixed as `Home`, `Status`, `Net`, `Mode`, `System`. `STOP` is not a navigation tab; it is a large Home-screen action.
+
+Offline clickable walkthrough: `docs/ui/local-touchscreen-walkthrough.html`.
 
 The local UI does not display the camera stream; camera viewing is web UI only. The local UI does not include a file browser or local job launcher. Jobs always originate from the external computer through LightBurn/GRBL. The local UI also must not depend on LightBurn-only metadata such as file name, job name, layer names, previews, or estimated time remaining.
 

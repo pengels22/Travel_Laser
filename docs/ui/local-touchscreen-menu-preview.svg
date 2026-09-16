@@ -1,0 +1,158 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2520" height="390" viewBox="0 0 2520 390">
+  <defs>
+    <style>
+      .page { fill: #f4f6f8; }
+      .screen { fill: #101820; stroke: #5b6775; stroke-width: 2; rx: 10; }
+      .bar { fill: #17232e; }
+      .panel { fill: #1b2733; stroke: #3d4d5e; stroke-width: 1.5; rx: 8; }
+      .panel2 { fill: #22303d; stroke: #4b5f73; stroke-width: 1.5; rx: 8; }
+      .blue { fill: #0876d9; }
+      .green { fill: #19a83a; }
+      .red { fill: #d52626; }
+      .yellow { fill: #d8a900; }
+      .gray { fill: #607080; }
+      .darkBtn { fill: #202c38; stroke: #4b5f73; stroke-width: 1.5; rx: 6; }
+      .text { font-family: Arial, Helvetica, sans-serif; fill: #f2f6fb; }
+      .muted { font-family: Arial, Helvetica, sans-serif; fill: #afbcc9; }
+      .label { font-family: Arial, Helvetica, sans-serif; fill: #111827; font-size: 20px; font-weight: 700; }
+      .tiny { font-size: 13px; }
+      .small { font-size: 15px; }
+      .mid { font-size: 20px; }
+      .big { font-size: 38px; font-weight: 700; }
+      .title { font-size: 24px; font-weight: 700; }
+      .pillText { font-family: Arial, Helvetica, sans-serif; fill: #ffffff; font-size: 15px; font-weight: 700; }
+    </style>
+  </defs>
+  <rect class="page" width="2520" height="390"/>
+
+  <!-- Screen 1: Home -->
+  <g transform="translate(20 42)">
+    <rect class="screen" width="480" height="320"/>
+    <rect class="bar" width="480" height="42"/>
+    <text class="text title" x="16" y="28">Travel-Laser</text>
+    <circle class="green" cx="306" cy="21" r="8"/>
+    <text class="text small" x="322" y="26">Ready</text>
+    <rect class="green" x="28" y="82" width="196" height="142" rx="12"/>
+    <rect class="red" x="256" y="82" width="196" height="142" rx="12"/>
+    <text class="text big" x="72" y="160">HOME</text>
+    <text class="text big" x="310" y="160">STOP</text>
+    <text class="muted small" x="181" y="248">Ready to operate</text>
+    <g transform="translate(8 264)">
+      <rect class="blue" width="88" height="48" rx="6"/><text class="text small" x="24" y="30">Home</text>
+      <rect class="darkBtn" x="96" width="88" height="48"/><text class="text small" x="113" y="30">Status</text>
+      <rect class="darkBtn" x="192" width="88" height="48"/><text class="text small" x="220" y="30">Net</text>
+      <rect class="darkBtn" x="288" width="80" height="48"/><text class="text small" x="311" y="30">Mode</text>
+      <rect class="darkBtn" x="376" width="88" height="48"/><text class="text small" x="395" y="30">System</text>
+    </g>
+    <text class="label" x="145" y="-14">Screen 1 - Home (480x320)</text>
+  </g>
+
+  <!-- Screen 2: Status -->
+  <g transform="translate(520 42)">
+    <rect class="screen" width="480" height="320"/>
+    <rect class="bar" width="480" height="42"/>
+    <text class="text title" x="16" y="28">Travel-Laser</text>
+    <circle class="green" cx="306" cy="21" r="8"/>
+    <text class="text small" x="322" y="26">Ready</text>
+    <g transform="translate(20 62)">
+      <rect class="panel" width="440" height="188"/>
+      <g class="text mid">
+        <text x="18" y="28">GRBL State</text><text x="18" y="58">LightBurn</text><text x="18" y="88">Active Stream</text>
+        <text x="18" y="118">Power</text><text x="18" y="148">E-stop Sense</text><text x="18" y="178">Safety Relay</text>
+      </g>
+      <g>
+        <rect class="green" x="265" y="10" width="145" height="24" rx="8"/><text class="pillText" x="319" y="28">Idle</text>
+        <rect class="green" x="265" y="40" width="145" height="24" rx="8"/><text class="pillText" x="300" y="58">Connected</text>
+        <rect class="gray" x="265" y="70" width="145" height="24" rx="8"/><text class="pillText" x="319" y="88">None</text>
+        <rect class="green" x="265" y="100" width="145" height="24" rx="8"/><text class="pillText" x="309" y="118">12V OK</text>
+        <rect class="green" x="265" y="130" width="145" height="24" rx="8"/><text class="pillText" x="323" y="148">OK</text>
+        <rect class="green" x="265" y="160" width="145" height="24" rx="8"/><text class="pillText" x="302" y="178">Engaged</text>
+      </g>
+    </g>
+    <g transform="translate(8 264)">
+      <rect class="darkBtn" width="88" height="48"/><text class="text small" x="24" y="30">Home</text>
+      <rect class="blue" x="96" width="88" height="48" rx="6"/><text class="text small" x="113" y="30">Status</text>
+      <rect class="darkBtn" x="192" width="88" height="48"/><text class="text small" x="220" y="30">Net</text>
+      <rect class="darkBtn" x="288" width="80" height="48"/><text class="text small" x="311" y="30">Mode</text>
+      <rect class="darkBtn" x="376" width="88" height="48"/><text class="text small" x="395" y="30">System</text>
+    </g>
+    <text class="label" x="140" y="-14">Screen 2 - Status (480x320)</text>
+  </g>
+
+  <!-- Screen 3: Network -->
+  <g transform="translate(1020 42)">
+    <rect class="screen" width="480" height="320"/>
+    <rect class="bar" width="480" height="42"/>
+    <text class="text title" x="16" y="28">Travel-Laser</text>
+    <circle class="green" cx="306" cy="21" r="8"/>
+    <text class="text small" x="322" y="26">Ready</text>
+    <rect class="panel" x="18" y="58" width="444" height="76"/>
+    <text class="text mid" x="36" y="88">Ethernet</text><text class="pillText" x="335" y="88">Connected</text>
+    <text class="text mid" x="36" y="118">Wi-Fi</text><text class="muted small" x="342" y="118">Workshop</text>
+    <rect class="panel" x="18" y="144" width="444" height="72"/>
+    <text class="muted small" x="36" y="168">Available Wi-Fi Networks</text>
+    <rect class="blue" x="34" y="178" width="410" height="26" rx="4"/>
+    <text class="text small" x="50" y="197">Workshop WiFi</text><text class="text small" x="360" y="197">selected</text>
+    <g transform="translate(18 228)">
+      <rect class="darkBtn" width="100" height="36"/><text class="text small" x="34" y="23">Scan</text>
+      <rect class="blue" x="112" width="110" height="36" rx="6"/><text class="text small" x="139" y="23">Connect</text>
+      <rect class="darkBtn" x="234" width="100" height="36"/><text class="text small" x="263" y="23">Forget</text>
+      <rect class="darkBtn" x="346" width="98" height="36"/><text class="text small" x="371" y="23">Refresh</text>
+    </g>
+    <g transform="translate(8 264)">
+      <rect class="darkBtn" width="88" height="48"/><text class="text small" x="24" y="30">Home</text>
+      <rect class="darkBtn" x="96" width="88" height="48"/><text class="text small" x="113" y="30">Status</text>
+      <rect class="blue" x="192" width="88" height="48" rx="6"/><text class="text small" x="220" y="30">Net</text>
+      <rect class="darkBtn" x="288" width="80" height="48"/><text class="text small" x="311" y="30">Mode</text>
+      <rect class="darkBtn" x="376" width="88" height="48"/><text class="text small" x="395" y="30">System</text>
+    </g>
+    <text class="label" x="132" y="-14">Screen 3 - Network (480x320)</text>
+  </g>
+
+  <!-- Screen 4: Mode -->
+  <g transform="translate(1520 42)">
+    <rect class="screen" width="480" height="320"/>
+    <rect class="bar" width="480" height="42"/>
+    <text class="text title" x="16" y="28">Travel-Laser</text>
+    <circle class="blue" cx="278" cy="21" r="8"/><text class="text small" x="294" y="26">Network Mode</text>
+    <rect class="panel2" x="24" y="66" width="432" height="72"/>
+    <text class="text mid" x="56" y="98">Network Mode</text><text class="muted small" x="56" y="120">USB connected to Orange Pi</text>
+    <rect class="panel" x="24" y="150" width="432" height="72"/>
+    <text class="text mid" x="56" y="182">VirtualHere Service Mode</text><text class="muted small" x="56" y="204">USB shared over network</text>
+    <rect x="90" y="90" width="300" height="140" rx="12" fill="#111820" stroke="#6a7a8a" stroke-width="2"/>
+    <text class="text mid" x="142" y="124">Confirm Mode Change</text>
+    <text class="muted small" x="123" y="154">Only one mode can own USB at a time.</text>
+    <rect class="gray" x="126" y="178" width="100" height="34" rx="6"/><text class="text small" x="156" y="200">Cancel</text>
+    <rect class="blue" x="254" y="178" width="100" height="34" rx="6"/><text class="text small" x="285" y="200">Switch</text>
+    <g transform="translate(8 264)">
+      <rect class="darkBtn" width="88" height="48"/><text class="text small" x="24" y="30">Home</text>
+      <rect class="darkBtn" x="96" width="88" height="48"/><text class="text small" x="113" y="30">Status</text>
+      <rect class="darkBtn" x="192" width="88" height="48"/><text class="text small" x="220" y="30">Net</text>
+      <rect class="blue" x="288" width="80" height="48" rx="6"/><text class="text small" x="311" y="30">Mode</text>
+      <rect class="darkBtn" x="376" width="88" height="48"/><text class="text small" x="395" y="30">System</text>
+    </g>
+    <text class="label" x="150" y="-14">Screen 4 - Mode (480x320)</text>
+  </g>
+
+  <!-- Screen 5: System -->
+  <g transform="translate(2020 42)">
+    <rect class="screen" width="480" height="320"/>
+    <rect class="bar" width="480" height="42"/>
+    <text class="text title" x="16" y="28">Travel-Laser</text>
+    <circle class="green" cx="306" cy="21" r="8"/>
+    <text class="text small" x="322" y="26">Ready</text>
+    <rect class="panel" x="24" y="56" width="432" height="196"/>
+    <g class="text mid">
+      <text x="48" y="86">GPIO Status</text><text x="48" y="116">USB Identity</text><text x="48" y="146">SPI / I2C</text>
+      <text x="48" y="176">View Logs</text><text x="48" y="206">Restart Services</text><text x="48" y="236">Reboot / Shutdown</text>
+    </g>
+    <g transform="translate(8 264)">
+      <rect class="darkBtn" width="88" height="48"/><text class="text small" x="24" y="30">Home</text>
+      <rect class="darkBtn" x="96" width="88" height="48"/><text class="text small" x="113" y="30">Status</text>
+      <rect class="darkBtn" x="192" width="88" height="48"/><text class="text small" x="220" y="30">Net</text>
+      <rect class="darkBtn" x="288" width="80" height="48"/><text class="text small" x="311" y="30">Mode</text>
+      <rect class="blue" x="376" width="88" height="48" rx="6"/><text class="text small" x="395" y="30">System</text>
+    </g>
+    <text class="label" x="142" y="-14">Screen 5 - System (480x320)</text>
+  </g>
+</svg>
