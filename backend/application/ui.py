@@ -27,27 +27,24 @@ class LocalUI:
         self.height = height
         self.buttons = (
             Button("STATUS", 8, 264, 88, 48),
-            Button("JOG", 104, 264, 88, 48),
-            Button("FILES", 200, 264, 88, 48),
-            Button("NET", 296, 264, 80, 48),
+            Button("HOME", 104, 264, 88, 48),
+            Button("NET", 200, 264, 88, 48),
+            Button("MODE", 296, 264, 80, 48),
             Button("STOP", 384, 264, 88, 48),
         )
 
-    def render_home(self, machine_state: str = "offline", laser_connected: bool = False, estop_ok: bool = False) -> bytes:
+    def render_home(self, machine_state: str = "offline") -> bytes:
         frame = RGB565Frame(self.width, self.height, BLACK)
         frame.fill_rect(0, 0, self.width, 44, DARK)
         frame.text(12, 14, "Travel-Laser", WHITE)
         frame.text(340, 14, machine_state.upper(), GREEN if machine_state == "idle" else YELLOW)
 
-        frame.text(24, 78, "Laser", WHITE)
-        frame.text(160, 78, "connected" if laser_connected else "disconnected", GREEN if laser_connected else RED)
-        frame.text(24, 118, "E-stop relay", WHITE)
-        frame.text(160, 118, "energized" if estop_ok else "dropped", GREEN if estop_ok else RED)
-        frame.text(24, 158, "Camera", WHITE)
-        frame.text(160, 158, "WebRTC", WHITE)
+        frame.text(24, 88, "Operator panel", WHITE)
+        frame.text(24, 128, "Use HOME to home GRBL", WHITE)
+        frame.text(24, 168, "Use STATUS for IO detail", WHITE)
 
         for button in self.buttons:
-            color = RED if button.label == "STOP" else BLUE
+            color = RED if button.label == "STOP" else GREEN if button.label == "HOME" else BLUE
             frame.fill_rect(button.x, button.y, button.width, button.height, color)
             frame.rect(button.x, button.y, button.width, button.height, WHITE)
             frame.text(button.x + 12, button.y + 18, button.label, WHITE)
@@ -90,4 +87,3 @@ class RGB565Frame:
             for col in range(5):
                 if bits & (1 << col):
                     self.fill_rect(x + col, y + row, 1, 1, color)
-
