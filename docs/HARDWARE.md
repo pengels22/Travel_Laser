@@ -6,7 +6,8 @@ Known relay meanings:
 
 Known Orange Pi pin assignments:
 
-- PC15: physical E-stop latching switch input, Linux GPIO `79`, header pin `16`.
+- PC14: power sense input, Linux GPIO `78`, header pin `18`.
+- PC15: E-stop power sense input, Linux GPIO `79`, header pin `16`.
 - PC8: K1 E-stop relay output, Linux GPIO `72`, header pin `15`.
 
 Relay polarity:
@@ -22,11 +23,12 @@ K1 behavior:
 
 Input behavior:
 
-- PC15 switch input is on `gpiochip0`.
-- PC15 high means E-stop OK. PC15 low means E-stop active.
+- PC14 and PC15 sense inputs are on `gpiochip0`.
+- PC14 high means laser input power is present.
+- PC15 high means E-stop power sense is OK. PC15 low means E-stop active.
 - Because internal software state tracks "E-stop active", PC15 is configured as active-low in `controller.yaml`.
-- PC15 is not pulled up or down by the controller configuration.
-- The switch signals are expected to be deterministic high or low with no floating/in-between state.
+- PC14 and PC15 are not pulled up or down by the controller configuration.
+- The sense signals are expected to be deterministic high or low with no floating/in-between state.
 - Do not enable internal GPIO pull-up/down bias unless the physical wiring changes.
 
 Serial:
@@ -40,7 +42,7 @@ Fire safety:
 
 GPIO mapping source:
 
-- PC8 and PC15 are mapped from the Orange Pi Zero 3 official documentation.
+- PC8, PC14, and PC15 are mapped from the Orange Pi Zero 3 official documentation.
 - Verify with `gpioinfo` on the target Armbian image during install, but the configured default chip is `gpiochip0`.
 
 USB devices must be identified by VID, PID, serial, or descriptive fallback. Do not rely on `/dev/ttyUSB0` or `/dev/video0`.

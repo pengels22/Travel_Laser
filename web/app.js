@@ -8,6 +8,8 @@ async function fetchStatus() {
 function renderStatus(state) {
   setText("machine-state", state.machine.state);
   setText("homed", String(state.machine.homed));
+  setText("power-sense", state.physical.power_sense ? "present" : "off");
+  setText("estop-sense", state.physical.estop_sense ? "active" : "ok");
   setText("k1", state.physical.k1 ? "on" : "off");
   setText("lightburn", state.lightburn.connected ? "connected" : "disconnected");
   setText("mode", state.mode.laser_mode);

@@ -3,9 +3,9 @@ from backend.safety import EstopSource, SafetyController
 from backend.state import ControllerState
 
 
-async def _safety(power_switch: bool = True):
+async def _safety(power_sense: bool = True):
     state = ControllerState()
-    gpio = MockGPIOBackend(power_switch=power_switch)
+    gpio = MockGPIOBackend(power_sense=power_sense)
     safety = SafetyController(state, gpio)
     await safety.initialize_safe()
     await safety.refresh_physical_inputs()
@@ -15,7 +15,7 @@ async def _safety(power_switch: bool = True):
 async def test_physical_estop_causes_k1_off():
     state, gpio, safety = await _safety()
     assert gpio.k1 is True
-    gpio.estop_switch = True
+    gpio.estop_sense = True
     await safety.refresh_physical_inputs()
     snapshot = await state.snapshot()
     assert snapshot.physical.k1 is False
@@ -44,13 +44,13 @@ async def test_software_estop_requires_physical_estop_cycle_to_clear():
     assert snapshot.safety.software_estop is True
     assert snapshot.physical.k1 is False
 
-    gpio.estop_switch = True
+    gpio.estop_sense = True
     await safety.refresh_physical_inputs()
     snapshot = await state.snapshot()
     assert snapshot.safety.software_estop is True
     assert snapshot.physical.k1 is False
 
-    gpio.estop_switch = False
+    gpio.estop_sense = False
     await safety.refresh_physical_inputs()
     snapshot = await state.snapshot()
     assert snapshot.safety.software_estop is False
@@ -146,4 +146,3 @@ async def test_camera_disconnect_does_not_affect_relays():
     await safety.handle_camera_disconnected()
     after = await state.snapshot()
     assert after.physical.k1 == before.physical.k1
-

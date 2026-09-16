@@ -9,25 +9,25 @@ from .config import GPIOConfig, GPIOLineConfig
 
 class GPIOBackend(Protocol):
     async def initialize_safe(self) -> None: ...
-    async def read_power_switch(self) -> bool: ...
-    async def read_estop_switch(self) -> bool: ...
+    async def read_power_sense(self) -> bool: ...
+    async def read_estop_sense(self) -> bool: ...
     async def set_k1(self, energized: bool) -> None: ...
 
 
 @dataclass
 class MockGPIOBackend:
-    power_switch: bool = False
-    estop_switch: bool = False
+    power_sense: bool = False
+    estop_sense: bool = False
     k1: bool = False
 
     async def initialize_safe(self) -> None:
         self.k1 = False
 
-    async def read_power_switch(self) -> bool:
-        return self.power_switch
+    async def read_power_sense(self) -> bool:
+        return self.power_sense
 
-    async def read_estop_switch(self) -> bool:
-        return self.estop_switch
+    async def read_estop_sense(self) -> bool:
+        return self.estop_sense
 
     async def set_k1(self, energized: bool) -> None:
         self.k1 = energized
@@ -45,10 +45,10 @@ class LinuxGPIOBackend:
         self._ensure_requested()
         await self.set_k1(False)
 
-    async def read_power_switch(self) -> bool:
+    async def read_power_sense(self) -> bool:
         return await self._read("power_input", self.config.power_input)
 
-    async def read_estop_switch(self) -> bool:
+    async def read_estop_sense(self) -> bool:
         return await self._read("estop_input", self.config.estop_input)
 
     async def set_k1(self, energized: bool) -> None:

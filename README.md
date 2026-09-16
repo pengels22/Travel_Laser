@@ -63,10 +63,11 @@ GRBL network mode is fixed to TCP port `23` for deployment. On macOS and many Li
 
 | Function | Orange Pi pin | Linux GPIO | Header pin | Direction | Active state |
 | --- | --- | ---: | ---: | --- | --- |
-| E-stop OK switch | PC15 | 79 | 16 | Input | High = OK, low = E-stop active |
+| Power sense input | PC14 | 78 | 18 | Input | High = laser input power present |
+| E-stop power sense input | PC15 | 79 | 16 | Input | High = OK, low = E-stop active |
 | K1 hard E-stop relay | PC8 | 72 | 15 | Output | Active high |
 
-These project GPIOs are configured on `gpiochip0`. PC15 uses `bias: none` because the switch signal is deterministic high/low from the wiring.
+These project GPIOs are configured on `gpiochip0`. PC14 and PC15 use `bias: none` because the sense signals are deterministic high/low from the wiring.
 
 ## Display And Touch
 

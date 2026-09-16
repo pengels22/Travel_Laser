@@ -9,9 +9,9 @@ def test_example_config_captures_deployment_defaults():
     assert config.laser.baud == 115200
     assert config.camera.stream_type == "webrtc"
     assert config.camera.resolution == "highest_available"
-    assert config.gpio.power_input.chip is None
-    assert config.gpio.power_input.line is None
-    assert config.gpio.power_input.board_pin is None
+    assert config.gpio.power_input.chip == "gpiochip0"
+    assert config.gpio.power_input.line == 78
+    assert config.gpio.power_input.board_pin == "PC14"
     assert config.gpio.power_input.active_high is True
     assert config.gpio.estop_input.line == 79
     assert config.gpio.estop_input.board_pin == "PC15"

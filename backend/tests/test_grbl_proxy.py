@@ -8,7 +8,7 @@ from backend.state import ControllerState, MachineState
 
 async def _proxy(port: int = 0):
     state = ControllerState()
-    gpio = MockGPIOBackend(power_switch=True)
+    gpio = MockGPIOBackend(power_sense=True)
     safety = SafetyController(state, gpio)
     await safety.initialize_safe()
     await safety.refresh_physical_inputs()
@@ -64,4 +64,3 @@ async def test_second_tcp_client_is_rejected():
         del reader1
     finally:
         await proxy.stop()
-

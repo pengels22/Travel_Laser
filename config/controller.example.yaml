@@ -55,16 +55,17 @@ touch:
 
 gpio:
   power_input:
-    # Optional future input. Unassigned in the current hardware plan.
-    chip: null
-    line: null
-    board_pin: null
+    # PC14 high means laser input power is present.
+    # Sense signal is deterministic; do not configure internal pull-up/down bias unless hardware changes.
+    chip: gpiochip0
+    line: 78
+    board_pin: PC14
     bias: none
     active_high: true
   estop_input:
-    # PC15 high means E-stop OK. Low means E-stop active.
+    # PC15 high means E-stop power sense is OK. Low means E-stop active.
     # active_high is false because the software state means "E-stop active".
-    # Switch signal is deterministic; do not configure internal pull-up/down bias unless hardware changes.
+    # Sense signal is deterministic; do not configure internal pull-up/down bias unless hardware changes.
     chip: gpiochip0
     line: 79
     board_pin: PC15

@@ -34,12 +34,12 @@ class SafetyController:
         await self.state.update(mutate)
 
     async def refresh_physical_inputs(self) -> None:
-        power = await self.gpio.read_power_switch()
-        estop = await self.gpio.read_estop_switch()
+        power = await self.gpio.read_power_sense()
+        estop = await self.gpio.read_estop_sense()
 
         def mutate(snapshot):
-            snapshot.physical.power_switch = power
-            snapshot.physical.estop_switch = estop
+            snapshot.physical.power_sense = power
+            snapshot.physical.estop_sense = estop
 
         await self.state.update(mutate)
         if estop:
@@ -74,7 +74,7 @@ class SafetyController:
 
         def mutate(snapshot):
             if source == EstopSource.PHYSICAL:
-                snapshot.physical.estop_switch = True
+                snapshot.physical.estop_sense = True
             elif source == EstopSource.LOCAL_UI:
                 snapshot.safety.remote_estop = True
             elif source in {EstopSource.WEB, EstopSource.SOFTWARE, EstopSource.LIGHTBURN, EstopSource.USB}:
@@ -93,7 +93,7 @@ class SafetyController:
             snapshot.safety.remote_estop = False
             snapshot.safety.software_estop = False
             snapshot.safety.fire_active = False
-            if not snapshot.physical.estop_switch:
+            if not snapshot.physical.estop_sense:
                 snapshot.machine.state = MachineState.RECOVERING
 
         await self.state.update(mutate)
@@ -157,7 +157,7 @@ class SafetyController:
     def _any_estop(self, snapshot) -> bool:
         fire_estop = snapshot.safety.fire_enabled and snapshot.safety.fire_active
         return (
-            snapshot.physical.estop_switch
+            snapshot.physical.estop_sense
             or snapshot.safety.remote_estop
             or snapshot.safety.software_estop
             or fire_estop

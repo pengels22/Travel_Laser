@@ -29,8 +29,8 @@ class LaserMode(str, Enum):
 
 @dataclass
 class PhysicalState:
-    power_switch: bool = False
-    estop_switch: bool = False
+    power_sense: bool = False
+    estop_sense: bool = False
     k1: bool = False
 
 
