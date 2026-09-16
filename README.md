@@ -29,6 +29,8 @@ Implemented:
 
 The Orange Pi touchscreen is a local control/status panel only. Camera viewing is web UI only, and the project does not expect LightBurn-specific metadata such as file name, job name, layer names, artwork preview, or estimated time remaining. The Pi does not store or launch local job files; jobs always originate from the external computer through LightBurn/GRBL.
 
+User-facing touchscreen labels should use common names such as `Power`, `E-stop Sense`, `Safety Relay`, and `Laser USB`; PC/GPIO names stay in hardware/config documentation.
+
 ## Development
 
 ```bash

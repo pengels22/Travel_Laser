@@ -19,9 +19,9 @@ travel-laser-ui --config /etc/travel-laser/controller.yaml --display st7796 --to
 Expected local screens:
 
 - Home: machine state plus two large same-priority controls, `HOME` and `STOP`.
-- Status: LightBurn TCP connection/stream state, PC14 power sense, PC15 E-stop sense, K1 relay, laser USB connection, and GRBL state.
-- Network: `eth0`, `wlan1`, IP address, Wi-Fi scan/connect/forget.
-- Mode: Network vs VirtualHere ownership.
+- Status: GRBL state, LightBurn TCP connection/stream state, Power, E-stop Sense, Safety Relay, and Laser USB connection.
+- Network: `eth0`, `wlan1`, IP address, Wi-Fi scan, SSID selection, password prompt, connect, forget, and refresh.
+- Mode: Network vs VirtualHere ownership. Selecting the inactive mode opens a confirmation popup before changing modes.
 - System: display/touch test, diagnostics, service controls, reboot/shutdown.
 
 Bottom navigation order is fixed as `Home`, `Status`, `Net`, `Mode`, `System`. `STOP` is not a navigation tab; it is a large Home-screen action.
@@ -31,3 +31,15 @@ The local UI does not display the camera stream; camera viewing is web UI only. 
 ## Network Settings
 
 Network settings apply to uplink Wi-Fi on `wlan1`. Ethernet `eth0` remains preferred when both uplinks are connected.
+
+Touchscreen Wi-Fi flow:
+
+1. Tap `Scan`.
+2. Select an SSID from the scan result list.
+3. Tap `Connect`.
+4. Enter the Wi-Fi password when prompted.
+5. Confirm connection status on the Network screen.
+
+## Mode Changes
+
+The Mode screen does not show a persistent warning panel. If the user selects the inactive mode, the UI shows a confirmation popup explaining that only one mode can own the laser USB connection at a time and that switching modes releases the current USB owner.
