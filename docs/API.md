@@ -32,6 +32,16 @@ Offline clickable walkthrough: `docs/ui/local-touchscreen-walkthrough.html`.
 
 The local UI does not display the camera stream; camera viewing is web UI only. The local UI does not include a file browser or local job launcher. Jobs always originate from the external computer through LightBurn/GRBL. The local UI also must not depend on LightBurn-only metadata such as file name, job name, layer names, previews, or estimated time remaining.
 
+Any text entry on the local touchscreen must open an on-screen keyboard. This includes Wi-Fi passwords and any future editable settings. The UI must not assume a physical keyboard.
+
+System subpages:
+
+- GPIO Status: list all configured GPIO users and logical high/low or active/inactive state.
+- USB Identity: show detected laser, camera, and export-drive identities.
+- SPI / I2C: show display/touch bus configuration and detection status.
+- View Logs: show recent controller/service log lines.
+- Export Logs to USB: report automatic export status. Actual export starts automatically when a filesystem USB drive larger than 200 MB is inserted.
+
 ## Network Settings
 
 Network settings apply to uplink Wi-Fi on `wlan1`. Ethernet `eth0` remains preferred when both uplinks are connected.

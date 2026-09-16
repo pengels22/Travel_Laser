@@ -21,5 +21,8 @@ Service units installed:
 - `mediamtx.service`
 - `travel-laser-camera.service`
 - `travel-laser-ui.service`
+- `travel-laser-log-export@.service`
 
 The controller service runs as `travel-laser` and uses `CAP_NET_BIND_SERVICE` so it can bind GRBL TCP port `23` without running as root.
+
+The installer also installs `/etc/udev/rules.d/99-travel-laser-log-export.rules`. When a filesystem USB partition appears, udev starts the log export service. The export script ignores drives smaller than 200 MB.

@@ -1,0 +1,8 @@
+[Unit]
+Description=Travel Laser USB Log Export for %I
+After=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/travel-laser-controller/scripts/export-logs-usb.sh %I
+TimeoutStartSec=120

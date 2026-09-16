@@ -65,7 +65,10 @@ cp systemd/travel-laser-controller.service /etc/systemd/system/travel-laser-cont
 cp systemd/travel-laser-camera.service /etc/systemd/system/travel-laser-camera.service
 cp systemd/mediamtx.service /etc/systemd/system/mediamtx.service
 cp systemd/travel-laser-ui.service /etc/systemd/system/travel-laser-ui.service
+cp systemd/travel-laser-log-export@.service /etc/systemd/system/travel-laser-log-export@.service
+cp systemd/99-travel-laser-log-export.rules /etc/udev/rules.d/99-travel-laser-log-export.rules
 systemctl daemon-reload
+udevadm control --reload-rules
 systemctl enable travel-laser-controller.service
 systemctl enable mediamtx.service
 systemctl enable travel-laser-camera.service

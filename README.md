@@ -26,6 +26,7 @@ Implemented:
 - MediaMTX/FFmpeg WebRTC camera service integration.
 - Display/touch abstraction layer with desktop framebuffer, ST7796U SPI, and FT6336U I2C implementations.
 - Local touchscreen app entry point and diagnostics utilities.
+- Automatic USB log export when a filesystem flash drive larger than 200 MB is inserted.
 
 The Orange Pi touchscreen is a local control/status panel only. Camera viewing is web UI only, and the project does not expect LightBurn-specific metadata such as file name, job name, layer names, artwork preview, or estimated time remaining. The Pi does not store or launch local job files; jobs always originate from the external computer through LightBurn/GRBL.
 
@@ -124,6 +125,16 @@ i2cdetect -l
 .venv/bin/python scripts/diagnostics/display_test.py --config /etc/travel-laser/controller.yaml --display st7796
 .venv/bin/python scripts/diagnostics/touch_test.py --config /etc/travel-laser/controller.yaml
 ```
+
+## Log Export
+
+On deployed hardware, inserting a filesystem USB flash drive larger than 200 MB starts `travel-laser-log-export@.service` through udev. Logs are copied to:
+
+```text
+<USB drive>/Travel-Laser-Logs/<hostname>-<UTC timestamp>/
+```
+
+The export includes `/var/log/travel-laser` plus recent journals for the controller, local UI, camera, and MediaMTX services. Drives under 200 MB are ignored.
 
 ## Remaining Hardware-Dependent Items
 

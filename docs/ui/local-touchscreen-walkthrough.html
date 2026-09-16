@@ -297,6 +297,39 @@
         gap: 7px;
       }
 
+      .subpage {
+        display: grid;
+        gap: 8px;
+      }
+
+      .subhead {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      .back {
+        min-height: 34px;
+        padding: 0 14px;
+        border-radius: 7px;
+        background: var(--blue);
+      }
+
+      .log-box {
+        height: 152px;
+        overflow: hidden;
+        padding: 10px;
+        border-radius: 8px;
+        background: #090f14;
+        border: 1px solid var(--line);
+        color: #d8e2ed;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 12px;
+        line-height: 1.35;
+        white-space: pre-wrap;
+      }
+
       .system-item {
         min-height: 34px;
         display: flex;
@@ -361,6 +394,45 @@
         background: var(--blue);
       }
 
+      .text-entry {
+        width: 100%;
+        min-height: 38px;
+        margin: 0 0 12px;
+        padding: 8px 10px;
+        border-radius: 7px;
+        background: #0a1118;
+        border: 1px solid var(--line);
+        color: var(--text);
+        font-size: 18px;
+      }
+
+      .keyboard {
+        display: grid;
+        gap: 6px;
+        margin-bottom: 12px;
+      }
+
+      .key-row {
+        display: grid;
+        grid-template-columns: repeat(10, 1fr);
+        gap: 5px;
+      }
+
+      .key-row:last-child {
+        grid-template-columns: 1.3fr repeat(7, 1fr) 1.3fr;
+      }
+
+      .key {
+        min-height: 31px;
+        border-radius: 5px;
+        background: #263544;
+        font-size: 14px;
+      }
+
+      .key.wide {
+        grid-column: span 3;
+      }
+
       .caption {
         color: #c8d1dc;
         font-size: 14px;
@@ -395,6 +467,7 @@
       const modal = document.getElementById("modal");
       let currentScreen = "home";
       let selectedSsid = "Workshop WiFi";
+      let passwordText = "";
 
       const screens = {
         home: renderHome,
@@ -402,6 +475,10 @@
         net: renderNetwork,
         mode: renderMode,
         system: renderSystem,
+        "system-gpio": renderGpioStatus,
+        "system-usb": renderUsbIdentity,
+        "system-spi": renderSpiI2c,
+        "system-logs": renderLogs,
       };
 
       document.querySelectorAll(".nav button").forEach((button) => {
@@ -484,13 +561,66 @@
       function renderSystem() {
         return `
           <div class="system-list">
-            ${systemItem("GPIO Status")}
-            ${systemItem("USB Identity")}
-            ${systemItem("SPI / I2C")}
-            ${systemItem("View Logs")}
+            ${systemItem("GPIO Status", "system-gpio")}
+            ${systemItem("USB Identity", "system-usb")}
+            ${systemItem("SPI / I2C", "system-spi")}
+            ${systemItem("View Logs", "system-logs")}
+            ${systemItem("Export Logs to USB")}
             ${systemItem("Restart Services")}
             ${systemItem("Reboot")}
-            ${systemItem("Shutdown", true)}
+            ${systemItem("Shutdown", "", true)}
+          </div>
+        `;
+      }
+
+      function renderGpioStatus() {
+        return `
+          <div class="subpage">
+            ${subhead("GPIO Status")}
+            ${row("Power", "High", "ok")}
+            ${row("E-stop Sense", "OK", "ok")}
+            ${row("Safety Relay", "High", "ok")}
+            ${row("LCD Reset", "High", "ok")}
+            ${row("Touch Reset", "High", "ok")}
+            ${row("Touch Interrupt", "Optional", "neutral")}
+          </div>
+        `;
+      }
+
+      function renderUsbIdentity() {
+        return `
+          <div class="subpage">
+            ${subhead("USB Identity")}
+            ${row("Laser Controller", "Matched", "ok")}
+            ${row("Laser USB", "Connected", "ok")}
+            ${row("Camera", "Matched", "ok")}
+            ${row("Export Drive", "None", "neutral")}
+          </div>
+        `;
+      }
+
+      function renderSpiI2c() {
+        return `
+          <div class="subpage">
+            ${subhead("SPI / I2C")}
+            ${row("Display SPI", "/dev/spidev1.0", "ok")}
+            ${row("Touch I2C", "/dev/i2c-3", "ok")}
+            ${row("Touch Address", "0x38", "ok")}
+            ${row("Touch Interrupt", "Optional", "neutral")}
+          </div>
+        `;
+      }
+
+      function renderLogs() {
+        return `
+          <div class="subpage">
+            ${subhead("View Logs")}
+            <div class="log-box">20:14:05 INFO controller ready in network mode
+20:14:07 INFO web portal started on 0.0.0.0:8080
+20:14:10 INFO laser usb connected
+20:14:12 INFO LightBurn connected
+20:15:03 INFO status poll: Idle
+20:15:30 INFO USB log export waiting for drive over 200 MB</div>
           </div>
         `;
       }
@@ -499,8 +629,12 @@
         return `<div class="row"><span>${label}</span><span class="pill ${tone}">${value}</span></div>`;
       }
 
-      function systemItem(label, danger = false) {
-        return `<button class="system-item ${danger ? "danger" : ""}"><span>${label}</span><span>›</span></button>`;
+      function subhead(title) {
+        return `<div class="subhead"><button class="back" data-screen="system">Back</button><strong>${title}</strong><span></span></div>`;
+      }
+
+      function systemItem(label, screen = "", danger = false) {
+        return `<button class="system-item ${danger ? "danger" : ""}" ${screen ? `data-screen="${screen}"` : `data-system-action="${label}"`}><span>${label}</span><span>›</span></button>`;
       }
 
       function wireScreen(screen) {
@@ -520,7 +654,7 @@
             });
           });
           content.querySelector('[data-action="connect"]').addEventListener("click", () => {
-            openModal("Wi-Fi Password", `Enter password for ${selectedSsid}.`, "Cancel", "Connect");
+            openKeyboardModal("Wi-Fi Password", `Enter password for ${selectedSsid}.`, "Cancel", "Connect");
           });
           content.querySelector('[data-action="forget"]').addEventListener("click", () => {
             openModal("Forget Network", `Forget ${selectedSsid}?`, "Cancel", "Forget");
@@ -532,6 +666,21 @@
               if (button.dataset.mode === "network") return;
               openModal("Confirm Mode Change", "Only one mode can own USB at a time. Switching modes releases the current USB owner.", "Cancel", "Switch");
             });
+          });
+        }
+        if (screen === "system") {
+          content.querySelectorAll("[data-screen]").forEach((button) => {
+            button.addEventListener("click", () => showScreen(button.dataset.screen));
+          });
+          content.querySelectorAll("[data-system-action]").forEach((button) => {
+            button.addEventListener("click", () => {
+              openModal(button.dataset.systemAction, "This action opens a confirmation or progress dialog on hardware.", "Close", "OK");
+            });
+          });
+        }
+        if (screen.startsWith("system-")) {
+          content.querySelectorAll("[data-screen]").forEach((button) => {
+            button.addEventListener("click", () => showScreen(button.dataset.screen));
           });
         }
       }
@@ -553,6 +702,61 @@
 
       function closeModal() {
         modalBackdrop.classList.remove("open");
+      }
+
+      function openKeyboardModal(title, message, cancelText, confirmText) {
+        passwordText = "";
+        modal.innerHTML = `
+          <h2>${title}</h2>
+          <p>${message}</p>
+          <input class="text-entry" id="keyboard-entry" type="password" value="" readonly aria-label="${title}">
+          <div class="keyboard">
+            ${keyRow("1234567890")}
+            ${keyRow("qwertyuiop")}
+            ${keyRow("asdfghjkl")}
+            <div class="key-row">
+              <button class="key" data-key="z">z</button>
+              <button class="key" data-key="x">x</button>
+              <button class="key" data-key="c">c</button>
+              <button class="key" data-key="v">v</button>
+              <button class="key" data-key="b">b</button>
+              <button class="key" data-key="n">n</button>
+              <button class="key" data-key="m">m</button>
+              <button class="key" data-key="-">-</button>
+              <button class="key" data-backspace>⌫</button>
+            </div>
+            <div class="key-row">
+              <button class="key wide" data-key=" ">Space</button>
+              <button class="key" data-key=".">.</button>
+              <button class="key" data-key="_">_</button>
+              <button class="key" data-key="@">@</button>
+              <button class="key" data-key="!">!</button>
+              <button class="key" data-key="?">?</button>
+            </div>
+          </div>
+          <div class="modal-actions">
+            <button data-close>${cancelText}</button>
+            <button class="primary" data-close>${confirmText}</button>
+          </div>
+        `;
+        modalBackdrop.classList.add("open");
+        modal.querySelectorAll("[data-key]").forEach((button) => {
+          button.addEventListener("click", () => {
+            passwordText += button.dataset.key;
+            modal.querySelector("#keyboard-entry").value = "•".repeat(passwordText.length);
+          });
+        });
+        modal.querySelector("[data-backspace]").addEventListener("click", () => {
+          passwordText = passwordText.slice(0, -1);
+          modal.querySelector("#keyboard-entry").value = "•".repeat(passwordText.length);
+        });
+        modal.querySelectorAll("[data-close]").forEach((button) => {
+          button.addEventListener("click", closeModal);
+        });
+      }
+
+      function keyRow(keys) {
+        return `<div class="key-row">${[...keys].map((key) => `<button class="key" data-key="${key}">${key}</button>`).join("")}</div>`;
       }
 
       modalBackdrop.addEventListener("click", (event) => {
