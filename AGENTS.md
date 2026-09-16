@@ -12,7 +12,7 @@ These instructions apply to the entire `Travel_Laser` workspace.
 ## Architectural Invariants
 
 - The project name is `travel-laser-controller`.
-- SCULPFUN TS1 runtime support is abandoned. Do not add active code that flashes, emulates, talks to, or depends on the TS1 accessory/controller/display.
+- Do not add active code that flashes, emulates, talks to, or depends on retired vendor accessory/controller/display hardware.
 - The supported local platform is Orange Pi Zero 3 plus a Hosyond 3.5-inch ST7796U SPI LCD and FT6336U I2C capacitive touch controller.
 - The Orange Pi backend owns GPIO and the laser USB serial device in normal Network mode.
 - GRBL Network mode TCP port is fixed at `23` for deployment.

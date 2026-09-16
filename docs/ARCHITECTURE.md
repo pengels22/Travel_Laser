@@ -13,4 +13,4 @@ Main services:
 
 Network mode owns the laser USB serial device. VirtualHere mode is a service/backup path and must not run concurrently with the GRBL proxy. VirtualHere will be installed on the Orange Pi, but its detailed configuration is handled separately from this first-pass backend.
 
-The retired accessory/controller research has been moved to `docs/archive/ts1-research/` and is historical only.
+Retired vendor accessory/controller research is not part of the active architecture.

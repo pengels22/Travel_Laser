@@ -1,6 +1,6 @@
 # travel-laser-controller
 
-Orange Pi Zero 3 laser controller for the Travel-Laser build. The SCULPFUN TS1 accessory/controller/display is obsolete for this project and is not used at runtime.
+Orange Pi Zero 3 laser controller for the Travel-Laser build.
 
 Active deployment path:
 
@@ -26,8 +26,6 @@ Implemented:
 - MediaMTX/FFmpeg WebRTC camera service integration.
 - Display/touch abstraction layer with desktop framebuffer, ST7796U SPI, and FT6336U I2C implementations.
 - Local touchscreen app entry point and diagnostics utilities.
-
-TS1 firmware notes and old scaffold files are archived under `docs/archive/ts1-research/`.
 
 ## Development
 
