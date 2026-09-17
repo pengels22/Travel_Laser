@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import glob
 import os
+import asyncio
 
 from .config import USBIdentity
 from .usb import USBDevice, matches_identity
@@ -48,8 +49,16 @@ def discover_serial_device(identity: USBIdentity) -> str:
     return candidates[0].path
 
 
-async def open_laser_serial(identity: USBIdentity, baud: int) -> AsyncSerialEndpoint:
-    path = discover_serial_device(identity)
+async def open_laser_serial(identity: USBIdentity, baud: int, timeout: float = 10.0) -> AsyncSerialEndpoint:
+    deadline = asyncio.get_running_loop().time() + timeout
+    while True:
+        try:
+            path = discover_serial_device(identity)
+            break
+        except RuntimeError:
+            if asyncio.get_running_loop().time() >= deadline:
+                raise RuntimeError("LASER_NOT_FOUND: laser USB did not enumerate before timeout")
+            await asyncio.sleep(0.25)
     try:
         import serial_asyncio
     except ImportError as exc:

@@ -4,6 +4,7 @@ from pathlib import Path
 
 from aiohttp import web
 
+from .command_service import ControllerCommandService
 from .grbl_proxy import GrblProxy
 from .safety import EstopSource, SafetyController
 from .state import ControllerState
@@ -18,10 +19,12 @@ class WebPortal:
         static_dir: Path,
         host: str,
         port: int,
+        commands: ControllerCommandService | None = None,
     ) -> None:
         self.state = state
         self.safety = safety
         self.proxy = proxy
+        self.commands = commands
         self.static_dir = static_dir
         self.host = host
         self.port = port
@@ -48,14 +51,15 @@ class WebPortal:
         return web.json_response(await self.state.to_dict())
 
     async def _home(self, _: web.Request) -> web.Response:
+        if self.commands:
+            result = await self.commands.home()
+            return web.json_response(result.as_dict(), status=200 if result.ok else 409)
         accepted = await self.proxy.home()
-        if not accepted:
-            return web.json_response(
-                {"ok": False, "message": "Home is unavailable while the machine is active"},
-                status=409,
-            )
-        return web.json_response({"ok": True})
+        return web.json_response({"ok": accepted}, status=200 if accepted else 409)
 
     async def _estop(self, _: web.Request) -> web.Response:
+        if self.commands:
+            result = await self.commands.estop(EstopSource.WEB, "web portal requested E-stop")
+            return web.json_response(result.as_dict())
         await self.safety.request_estop(EstopSource.WEB, "web portal requested E-stop")
         return web.json_response({"ok": True})

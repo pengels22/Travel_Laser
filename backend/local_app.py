@@ -2,16 +2,17 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
-from .application.ui import CONTENT_BOTTOM, CONTENT_TOP, LocalUI, ScreenName
+from .application.ui import CONTENT_BOTTOM, CONTENT_TOP, LocalUI, ScreenName, UIState
 from .config import load_config
 from .display.desktop_display import DesktopDisplay
 from .display.interface import Display, DisplayConfig
 from .display.st7796_display import ST7796Display
 from .input.touch_interface import TouchEvent
 from .input.ft6336_touch import FT6336Touch
+from .ui_client import LocalAPIClient
 
 IDLE_HOME_TIMEOUT_SECONDS = 20.0
 SCROLL_REDRAW_DELTA_PIXELS = 2
@@ -26,6 +27,9 @@ class LocalUIRuntime:
     drag_moved: bool = False
     drag_pending_control: bool = False
     drag_pending_started_at: float = 0.0
+    pending_control: str | None = None
+    backend_state: UIState = field(default_factory=UIState)
+    message: str | None = None
 
 
 async def run(config_path: Path | None, display_mode: str, touch_mode: str) -> None:
@@ -47,8 +51,6 @@ async def run(config_path: Path | None, display_mode: str, touch_mode: str) -> N
     await display.initialize()
     ui = LocalUI(display.width, display.height)
     runtime = LocalUIRuntime()
-    await _draw_screen(display, ui, runtime)
-
     touch = None
     if touch_mode == "ft6336":
         if config.touch.i2c_bus is None:
@@ -65,33 +67,49 @@ async def run(config_path: Path | None, display_mode: str, touch_mode: str) -> N
         await touch.initialize()
 
     last_touch_at = asyncio.get_running_loop().time()
+    last_backend_poll = 0.0
     try:
-        while True:
-            if touch is None:
-                await asyncio.sleep(1)
-            else:
+        async with LocalAPIClient() as api:
+            await _draw_screen(display, ui, runtime)
+            while True:
+                now = asyncio.get_running_loop().time()
+                if now - last_backend_poll >= 0.2:
+                    backend = await api.state()
+                    next_state = UIState.from_payload(backend.raw, online=backend.online)
+                    if next_state != runtime.backend_state:
+                        runtime.backend_state = next_state
+                        await _draw_screen(display, ui, runtime)
+                    last_backend_poll = now
+
+                if touch is None:
+                    await asyncio.sleep(0.1)
+                    continue
+
                 event = await touch.read_event()
                 if event:
-                    last_touch_at = asyncio.get_running_loop().time()
-                    if _apply_touch(ui, runtime, event, now=asyncio.get_running_loop().time()):
+                    last_touch_at = now
+                    if _apply_touch(ui, runtime, event, now=now):
                         await _draw_screen(display, ui, runtime)
-                elif _should_return_home(
-                    current_screen=runtime.screen,
-                    last_touch_at=last_touch_at,
-                    now=asyncio.get_running_loop().time(),
-                    timeout_seconds=IDLE_HOME_TIMEOUT_SECONDS,
-                ):
+                    if event.kind == "up" and runtime.pending_control:
+                        command = runtime.pending_control
+                        runtime.pending_control = None
+                        path = {
+                            "home": "/commands/home", "stop": "/commands/stop", "estop": "/commands/estop",
+                            "scan": "/network/scan", "export-logs": "/logs/export",
+                            "restart-services": "/system/restart", "reboot": "/system/reboot", "shutdown": "/system/shutdown",
+                        }.get(command)
+                        if path and runtime.backend_state.online:
+                            result = await api.command(path)
+                            runtime.message = result.get("message")
+                            await _draw_screen(display, ui, runtime)
+                elif _should_return_home(runtime.screen, last_touch_at, now):
                     runtime.screen = "home"
                     runtime.scroll_y = 0
-                    runtime.drag_last_y = None
-                    runtime.drag_moved = False
-                    runtime.drag_pending_control = False
-                    runtime.drag_pending_started_at = 0.0
                     await _draw_screen(display, ui, runtime)
     finally:
         if touch is not None:
             await touch.close()
-        await display.close()
+    await display.close()
 
 
 async def _draw_screen(display: Display, ui: LocalUI, runtime: LocalUIRuntime) -> None:
@@ -100,7 +118,7 @@ async def _draw_screen(display: Display, ui: LocalUI, runtime: LocalUIRuntime) -
         0,
         display.width,
         display.height,
-        ui.render(runtime.screen, scroll_y=runtime.scroll_y),
+        ui.render(runtime.screen, scroll_y=runtime.scroll_y, state=runtime.backend_state),
     )
 
 
@@ -138,6 +156,7 @@ def _apply_touch(ui: LocalUI, runtime: LocalUIRuntime, event: TouchEvent, now: f
             runtime.drag_moved = False
             runtime.drag_pending_control = True
             runtime.drag_pending_started_at = now
+            runtime.pending_control = ui.hit_content_control(runtime.screen, point.x, point.y, runtime.scroll_y)
             return False
         if CONTENT_TOP <= point.y < CONTENT_BOTTOM:
             runtime.drag_last_y = point.y
@@ -153,6 +172,7 @@ def _apply_touch(ui: LocalUI, runtime: LocalUIRuntime, event: TouchEvent, now: f
         if now - runtime.drag_pending_started_at < CONTROL_SCROLL_HOLD_SECONDS:
             return False
         runtime.drag_pending_control = False
+        runtime.pending_control = None
 
     delta_y = point.y - runtime.drag_last_y
     runtime.drag_last_y = point.y

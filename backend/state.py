@@ -63,8 +63,10 @@ class CameraState:
 @dataclass
 class NetworkState:
     ethernet_connected: bool = False
+    ethernet_ip: str | None = None
     wifi_connected: bool = False
     wifi_ssid: str | None = None
+    wifi_ip: str | None = None
     ip_address: str | None = None
     tailscale_connected: bool = False
     tailscale_interface: str = "tailscale0"

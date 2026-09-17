@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 from typing import Literal
 
 
@@ -31,6 +32,67 @@ class Button:
     height: int
 
 
+@dataclass
+class UIState:
+    online: bool = False
+    machine_state: str = "offline"
+    homed: bool = False
+    power_present: bool = False
+    estop_active: bool = False
+    k1_energized: bool = False
+    laser_usb_connected: bool = False
+    grbl_connected: bool = False
+    lightburn_connected: bool = False
+    lightburn_stream_active: bool = False
+    tailscale_connected: bool = False
+    tailscale_ip: str | None = None
+    ethernet_connected: bool = False
+    ethernet_ip: str | None = None
+    wifi_connected: bool = False
+    wifi_ssid: str | None = None
+    wifi_ip: str | None = None
+    current_mode: str = "network"
+    camera_connected: bool = False
+    faults: tuple[str, ...] = ()
+
+    @classmethod
+    def from_payload(cls, payload: dict[str, Any], online: bool = True) -> "UIState":
+        machine = payload.get("machine", {})
+        physical = payload.get("physical", {})
+        lightburn = payload.get("lightburn", {})
+        network = payload.get("network", {})
+        mode = payload.get("mode", {})
+        camera = payload.get("camera", {})
+        safety = payload.get("safety", {})
+        faults = []
+        if machine.get("error"):
+            faults.append(str(machine["error"]))
+        if safety.get("software_estop"):
+            faults.append("Software E-stop active")
+        return cls(
+            online=online,
+            machine_state=str(machine.get("state", "offline")),
+            homed=bool(machine.get("homed", False)),
+            power_present=bool(physical.get("power_sense", False)),
+            estop_active=bool(physical.get("estop_sense", False)),
+            k1_energized=bool(physical.get("k1", False)),
+            laser_usb_connected=bool(machine.get("laser_usb_connected", False)),
+            grbl_connected=bool(machine.get("connected_to_grbl", False)),
+            lightburn_connected=bool(lightburn.get("connected", False)),
+            lightburn_stream_active=bool(lightburn.get("stream_active", False)),
+            tailscale_connected=bool(network.get("tailscale_connected", False)),
+            tailscale_ip=network.get("tailscale_ip"),
+            ethernet_connected=bool(network.get("ethernet_connected", False)),
+            ethernet_ip=network.get("ethernet_ip") or network.get("ip_address"),
+            wifi_connected=bool(network.get("wifi_connected", False)),
+            wifi_ssid=network.get("wifi_ssid"),
+            wifi_ip=network.get("wifi_ip"),
+            current_mode=str(mode.get("laser_mode", "network")),
+            camera_connected=bool(camera.get("connected", False)),
+            faults=tuple(faults),
+        )
+
+
 class LocalUI:
     def __init__(self, width: int = 480, height: int = 320) -> None:
         self.width = width
@@ -47,19 +109,20 @@ class LocalUI:
             Button("STOP", 256, 82, 196, 142),
         )
 
-    def render(self, screen: ScreenName = "home", machine_state: str = "idle", scroll_y: int = 0) -> bytes:
+    def render(self, screen: ScreenName = "home", machine_state: str = "idle", scroll_y: int = 0, state: UIState | None = None) -> bytes:
+        state = state or UIState(online=True, machine_state=machine_state)
         frame = RGB565Frame(self.width, self.height, BLACK)
         if screen == "home":
-            self._draw_home(frame)
+            self._draw_home(frame, state)
         elif screen == "status":
-            self._draw_status(frame, scroll_y)
+            self._draw_status(frame, scroll_y, state)
         elif screen == "net":
-            self._draw_network(frame, scroll_y)
+            self._draw_network(frame, scroll_y, state)
         elif screen == "mode":
-            self._draw_mode(frame, scroll_y)
+            self._draw_mode(frame, scroll_y, state)
         elif screen == "system":
             self._draw_system(frame, scroll_y)
-        self._draw_shell(frame, screen, machine_state)
+        self._draw_shell(frame, screen, state)
         return bytes(frame.data)
 
     def render_home(self, machine_state: str = "idle") -> bytes:
@@ -125,11 +188,15 @@ class LocalUI:
                 row_y += 30
         return None
 
-    def _draw_shell(self, frame: "RGB565Frame", active_screen: ScreenName, machine_state: str) -> None:
+    def _draw_shell(self, frame: "RGB565Frame", active_screen: ScreenName, state: UIState) -> None:
         frame.fill_rect(0, 0, self.width, 44, DARK)
         frame.text(12, 14, "Travel-Laser", WHITE, scale=2)
-        frame.fill_circle(272, 21, 6, GREEN if machine_state == "idle" else YELLOW)
-        frame.text(286, 14, "Ready" if machine_state == "idle" else machine_state.title(), WHITE)
+        if not state.online:
+            frame.fill_circle(272, 21, 6, RED)
+            frame.text(286, 14, "Offline", WHITE)
+        else:
+            frame.fill_circle(272, 21, 6, GREEN if state.machine_state == "idle" else YELLOW)
+            frame.text(286, 14, state.machine_state.title(), WHITE)
 
         for button, screen_name in zip(
             self.nav_buttons,
@@ -145,24 +212,29 @@ class LocalUI:
             else:
                 frame.text(button.x + 12, button.y + 19, button.label, WHITE)
 
-    def _draw_home(self, frame: "RGB565Frame") -> None:
+    def _draw_home(self, frame: "RGB565Frame", state: UIState) -> None:
+        if not state.online:
+            frame.text(78, 92, "CONTROLLER OFFLINE", RED, scale=2)
+            frame.text(70, 126, "Machine control unavailable", WHITE)
+            frame.text(72, 150, "Physical E-stop remains active", MUTED)
+            return
         for button in self.home_actions:
             color = RED if button.label == "STOP" else GREEN
             frame.fill_rect(button.x, button.y, button.width, button.height, color)
             frame.rect(button.x, button.y, button.width, button.height, GRAY)
             frame.text(button.x + 54, button.y + 52, button.label, WHITE, scale=3)
-        frame.text(176, 244, "Ready to operate", MUTED)
+        frame.text(176, 244, "Ready to operate" if state.grbl_connected else "Waiting for laser", MUTED)
 
-    def _draw_status(self, frame: "RGB565Frame", scroll_y: int) -> None:
+    def _draw_status(self, frame: "RGB565Frame", scroll_y: int, state: UIState) -> None:
         rows = (
-            ("GRBL State", "Idle", GREEN),
-            ("LightBurn", "Connected", GREEN),
-            ("Active Stream", "None", GRAY),
-            ("Power", "12V OK", GREEN),
-            ("E-stop Sense", "OK", GREEN),
-            ("Safety Relay", "Engaged", GREEN),
-            ("Laser USB", "Connected", GREEN),
-            ("Tailscale", "Waiting", YELLOW),
+            ("GRBL State", state.machine_state.title(), GREEN if state.grbl_connected else YELLOW),
+            ("LightBurn", "Connected" if state.lightburn_connected else "Disconnected", GREEN if state.lightburn_connected else GRAY),
+            ("Active Stream", "Active" if state.lightburn_stream_active else "None", RED if state.lightburn_stream_active else GRAY),
+            ("Power", "12V OK" if state.power_present else "Off", GREEN if state.power_present else GRAY),
+            ("E-stop Sense", "Active" if state.estop_active else "OK", RED if state.estop_active else GREEN),
+            ("Safety Relay", "Engaged" if state.k1_energized else "Dropped", GREEN if state.k1_energized else RED),
+            ("Laser USB", "Connected" if state.laser_usb_connected else "Missing", GREEN if state.laser_usb_connected else RED),
+            ("Tailscale", state.tailscale_ip or "Waiting", GREEN if state.tailscale_connected else YELLOW),
         )
         y = 58 - scroll_y
         for label, value, color in rows:
@@ -174,19 +246,19 @@ class LocalUI:
             y += 28
         self._draw_scrollbar(frame, "status", scroll_y)
 
-    def _draw_network(self, frame: "RGB565Frame", scroll_y: int) -> None:
+    def _draw_network(self, frame: "RGB565Frame", scroll_y: int, state: UIState) -> None:
         y_offset = -scroll_y
         frame.fill_rect(18, 56 + y_offset, 214, 74, PANEL)
         frame.rect(18, 56 + y_offset, 214, 74, GRAY)
         frame.text(34, 76 + y_offset, "Ethernet", WHITE, scale=2)
-        frame.text(132, 80 + y_offset, "Connected", WHITE)
-        frame.text(34, 108 + y_offset, "192.168.1.42", MUTED)
+        frame.text(132, 80 + y_offset, "Connected" if state.ethernet_connected else "Offline", WHITE)
+        frame.text(34, 108 + y_offset, state.ethernet_ip or "No address", MUTED)
 
         frame.fill_rect(248, 56 + y_offset, 214, 74, PANEL)
         frame.rect(248, 56 + y_offset, 214, 74, GRAY)
         frame.text(264, 76 + y_offset, "Wi-Fi", WHITE, scale=2)
-        frame.text(336, 80 + y_offset, "Workshop", MUTED)
-        frame.text(264, 108 + y_offset, "192.168.1.58", MUTED)
+        frame.text(336, 80 + y_offset, state.wifi_ssid or "Offline", MUTED)
+        frame.text(264, 108 + y_offset, state.wifi_ip or "No address", MUTED)
 
         frame.fill_rect(18, 140 + y_offset, 444, 112, PANEL)
         frame.rect(18, 140 + y_offset, 444, 112, GRAY)
@@ -212,17 +284,17 @@ class LocalUI:
             frame.text(button.x + 20, button.y + 14, button.label, WHITE)
         self._draw_scrollbar(frame, "net", scroll_y)
 
-    def _draw_mode(self, frame: "RGB565Frame", scroll_y: int) -> None:
+    def _draw_mode(self, frame: "RGB565Frame", scroll_y: int, state: UIState) -> None:
         y_offset = -scroll_y
         frame.fill_rect(24, 66 + y_offset, 432, 72, PANEL_ALT)
         frame.rect(24, 66 + y_offset, 432, 72, BLUE)
         frame.text(56, 94 + y_offset, "Network Mode", WHITE, scale=2)
-        frame.text(56, 118 + y_offset, "USB connected to Orange Pi", MUTED)
+        frame.text(56, 118 + y_offset, "ACTIVE" if state.current_mode == "network" else "Select to use", MUTED)
 
         frame.fill_rect(24, 150 + y_offset, 432, 72, PANEL)
         frame.rect(24, 150 + y_offset, 432, 72, GRAY)
         frame.text(56, 178 + y_offset, "VirtualHere Service Mode", WHITE, scale=2)
-        frame.text(56, 202 + y_offset, "USB shared over network", MUTED)
+        frame.text(56, 202 + y_offset, "ACTIVE" if state.current_mode == "virtualhere" else "Select to use", MUTED)
 
     def _draw_system(self, frame: "RGB565Frame", scroll_y: int) -> None:
         items = (

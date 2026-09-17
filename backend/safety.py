@@ -152,7 +152,11 @@ class SafetyController:
         source: str = "safety",
         details: dict | None = None,
     ) -> None:
-        self.events.append(ControllerEvent(code=code, severity=severity, source=source, details=details or {}))
+        event = ControllerEvent(code=code, severity=severity, source=source, details=details or {})
+        self.events.append(event)
+        emit = getattr(self.event_sink, "emit", None)
+        if emit:
+            emit(event)
 
     def _any_estop(self, snapshot) -> bool:
         fire_estop = snapshot.safety.fire_enabled and snapshot.safety.fire_active

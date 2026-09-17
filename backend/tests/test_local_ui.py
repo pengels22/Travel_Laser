@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from backend.application.ui import LocalUI
+from backend.application.ui import LocalUI, UIState
 from backend.input.touch_interface import TouchEvent, TouchPoint
 from backend.local_app import LocalUIRuntime, _apply_touch, _screen_for_touch, _should_return_home
 
@@ -12,6 +12,21 @@ def test_local_ui_renders_all_primary_screens() -> None:
         frame = ui.render(screen)
 
         assert len(frame) == ui.width * ui.height * 2
+
+
+def test_ui_state_comes_from_controller_payload_and_supports_offline() -> None:
+    state = UIState.from_payload(
+        {
+            "machine": {"state": "idle", "connected_to_grbl": True},
+            "physical": {"power_sense": True, "k1": True},
+            "network": {"wifi_connected": True, "wifi_ip": "192.0.2.10"},
+        }
+    )
+    assert state.online is True
+    assert state.grbl_connected is True
+    assert state.wifi_ip == "192.0.2.10"
+    offline = UIState(online=False)
+    assert len(LocalUI().render("home", state=offline)) == 480 * 320 * 2
 
 
 def test_local_ui_nav_hit_testing() -> None:

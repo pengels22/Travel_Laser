@@ -105,6 +105,9 @@ Main services:
 - GRBL proxy exposes the laser to LightBurn as a TCP GRBL device on port `23`.
 - Local UI renders machine controls and hardware status to the Hosyond ST7796U/FT6336U touchscreen.
 - Web portal serves only the WebRTC camera, HOME, E-STOP, and LASER OK/FAULT status. Hardware detail and diagnostics remain on the local touchscreen.
+- `travel-laser-controller` owns the canonical state, safety, GRBL, networking, mode, USB, logging, and system-action services.
+- `travel-laser-ui` owns only the SPI display, FT6336 touch input, rendering, and a client for the controller's loopback API.
+- The local touchscreen API is bound strictly to `127.0.0.1:8081`; it is never exposed on LAN, Wi-Fi, Ethernet, Tailscale, or `0.0.0.0`.
 - Mode manager enforces exclusive Network vs VirtualHere ownership.
 
 Network mode owns the laser USB serial device. VirtualHere mode is a backup/service path and must not run concurrently with the GRBL proxy. VirtualHere is expected to be installed on the Orange Pi, but configured separately unless `VIRTUALHERE_BACKEND_CONTROLS_SERVICE=true` is deliberately enabled after testing.
@@ -158,6 +161,10 @@ The local touchscreen UI is rendered directly on the Orange Pi:
 ```bash
 travel-laser-ui --config /etc/travel-laser/controller.yaml --display st7796 --touch ft6336
 ```
+
+The UI polls the controller at `http://127.0.0.1:8081/state` approximately every 200 ms. Commands use the same loopback API and never access GPIO, GRBL serial, USB, NetworkManager, VirtualHere, or systemd directly.
+
+Local API routes include `/state`, `/health`, `/commands/home`, `/commands/stop`, `/commands/estop`, `/network/scan`, `/network/connect`, `/network/forget`, `/mode`, `/logs/export`, and the `/system/*` maintenance routes. All responses use structured JSON with `ok`, `status`, `message`, `code`, and `data` fields.
 
 All local screens target `480x320` landscape:
 
