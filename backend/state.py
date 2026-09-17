@@ -88,6 +88,19 @@ class ModeState:
 
 
 @dataclass
+class DiagnosticsState:
+    gpio_status: str = "UNVALIDATED"
+    spi_device: str | None = None
+    spi_status: str = "UNVALIDATED"
+    i2c_bus: int | None = None
+    i2c_address: int | None = None
+    i2c_status: str = "UNVALIDATED"
+    display_status: str = "UNVALIDATED"
+    touch_status: str = "UNVALIDATED"
+    usb_devices: list[dict[str, Any]] = field(default_factory=list)
+
+
+@dataclass
 class ControllerSnapshot:
     physical: PhysicalState = field(default_factory=PhysicalState)
     machine: MachineRuntimeState = field(default_factory=MachineRuntimeState)
@@ -96,6 +109,7 @@ class ControllerSnapshot:
     network: NetworkState = field(default_factory=NetworkState)
     safety: SafetyState = field(default_factory=SafetyState)
     mode: ModeState = field(default_factory=ModeState)
+    diagnostics: DiagnosticsState = field(default_factory=DiagnosticsState)
     ready: bool = False
 
 
@@ -138,6 +152,7 @@ class ControllerState:
             network=NetworkState(**data["network"]),
             safety=SafetyState(**data["safety"]),
             mode=ModeState(laser_mode=LaserMode(data["mode"]["laser_mode"])),
+            diagnostics=DiagnosticsState(**data["diagnostics"]),
             ready=data["ready"],
         )
 

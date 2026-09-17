@@ -164,7 +164,9 @@ travel-laser-ui --config /etc/travel-laser/controller.yaml --display st7796 --to
 
 The UI polls the controller at `http://127.0.0.1:8081/state` approximately every 200 ms. Commands use the same loopback API and never access GPIO, GRBL serial, USB, NetworkManager, VirtualHere, or systemd directly.
 
-Local API routes include `/state`, `/health`, `/commands/home`, `/commands/stop`, `/commands/estop`, `/network/scan`, `/network/connect`, `/network/forget`, `/mode`, `/logs/export`, and the `/system/*` maintenance routes. All responses use structured JSON with `ok`, `status`, `message`, `code`, and `data` fields.
+Local API routes include `/state`, `/health`, `/diagnostics`, `/commands/home`, `/commands/stop`, `/commands/estop`, `/network/scan`, `/network/connect`, `/network/forget`, `/mode`, `/logs/export`, and the `/system/*` maintenance routes. All responses use structured JSON with `ok`, `status`, `message`, `code`, and `data` fields.
+
+Touchscreen confirmation, busy, success, error, and text-entry state are represented by reusable dialog models. Modal dialogs suppress page scrolling and suspend the idle-home timer. Manual log export searches only mounted USB filesystem partitions and writes a unique `Travel_Laser_Logs_<timestamp>` directory; it never selects the internal system disk.
 
 All local screens target `480x320` landscape:
 
@@ -181,6 +183,20 @@ Any local page content beyond the fixed header/nav viewport must scroll vertical
 After 20 seconds with no touch input, the deployed local touchscreen returns to the Home screen. Any text entry on the local touchscreen must open an on-screen keyboard, including Wi-Fi passwords and future editable settings.
 
 The local UI does not display the camera stream, does not include a file browser, and does not launch local jobs. Jobs always originate from the external computer through LightBurn/GRBL.
+
+## Hardware Bring-Up Checklist
+
+The following remain physical validation items and are intentionally not guessed by software:
+
+- Orange Pi Server boot, 5 V rail, temperature, gpiochip enumeration, and service permissions.
+- SPI1 device node, ST7796U initialization, landscape rotation, backlight, and reset behavior.
+- I2C3/FT6336U response, touch orientation, edge accuracy, and touch reset.
+- K1 power-loop behavior, S6 USB enumeration delay, VID/PID/serial identity, disconnect on K1 drop, and recovery after K1 restore.
+- Camera path, resolution/FPS stability, bandwidth, and power behavior.
+- Ethernet, wlan0 scan/connect, Tailscale startup/IP, Tailscale-only port `8080`, and loopback-only port `8081`.
+- Physical E-stop drop, expected USB loss after K1 drop, and unexpected USB loss while K1 is energized.
+
+Diagnostics report `UNVALIDATED`, `UNKNOWN`, or `NOT DETECTED` until the backend can verify a device. No final USB identifiers, SPI node, I2C permissions, or unverified GPIO mappings are promoted by the UI.
 
 ## Web Portal And Camera
 

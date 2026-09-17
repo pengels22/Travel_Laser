@@ -45,6 +45,9 @@ async def run(config_path: Path | None, mock: bool) -> None:
             if config.network.tailscale_enabled
             else "disabled"
         )
+        snapshot.diagnostics.spi_device = config.display.spi_device
+        snapshot.diagnostics.i2c_bus = config.touch.i2c_bus
+        snapshot.diagnostics.i2c_address = config.touch.i2c_address
 
     await state.update(apply_config)
 

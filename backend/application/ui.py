@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from typing import Any
 from typing import Literal
 
+from .dialogs import DialogKind, DialogState
+
 
 BLACK = 0x0000
 WHITE = 0xFFFF
@@ -109,7 +111,7 @@ class LocalUI:
             Button("STOP", 256, 82, 196, 142),
         )
 
-    def render(self, screen: ScreenName = "home", machine_state: str = "idle", scroll_y: int = 0, state: UIState | None = None) -> bytes:
+    def render(self, screen: ScreenName = "home", machine_state: str = "idle", scroll_y: int = 0, state: UIState | None = None, dialog: DialogState | None = None) -> bytes:
         state = state or UIState(online=True, machine_state=machine_state)
         frame = RGB565Frame(self.width, self.height, BLACK)
         if screen == "home":
@@ -123,7 +125,24 @@ class LocalUI:
         elif screen == "system":
             self._draw_system(frame, scroll_y)
         self._draw_shell(frame, screen, state)
+        if dialog:
+            self._draw_dialog(frame, dialog)
         return bytes(frame.data)
+
+    def _draw_dialog(self, frame: "RGB565Frame", dialog: DialogState) -> None:
+        frame.fill_rect(0, 44, self.width, 220, DARK)
+        frame.rect(24, 60, 432, 184, RED if dialog.severity == "critical" else BLUE)
+        frame.text(48, 78, dialog.title, WHITE, scale=2)
+        frame.text(48, 116, dialog.message[:48], WHITE)
+        if dialog.kind == DialogKind.BUSY:
+            frame.text(48, 146, "Please wait...", MUTED)
+            return
+        frame.fill_rect(48, 184, 170, 42, DARK)
+        frame.rect(48, 184, 170, 42, GRAY)
+        frame.text(74, 202, dialog.cancel_label, WHITE)
+        frame.fill_rect(262, 184, 170, 42, RED if dialog.severity == "critical" else GREEN)
+        frame.rect(262, 184, 170, 42, GRAY)
+        frame.text(288, 202, dialog.confirm_label, WHITE)
 
     def render_home(self, machine_state: str = "idle") -> bytes:
         return self.render("home", machine_state)

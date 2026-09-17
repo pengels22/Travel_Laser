@@ -11,6 +11,7 @@ from .mode_manager import ModeManager
 from .network_manager import NetworkManager
 from .safety import EstopSource, SafetyController
 from .state import ControllerState, LaserMode, MachineState
+from .log_export import USBLogExporter
 
 
 class SystemActions(Protocol):
@@ -39,9 +40,8 @@ class LogExporter(Protocol):
     async def export(self) -> str: ...
 
 
-class DefaultLogExporter:
-    async def export(self) -> str:
-        raise RuntimeError("insert a USB drive larger than 200 MB to export logs")
+class DefaultLogExporter(USBLogExporter):
+    pass
 
 
 class CommandStatus(str, Enum):

@@ -5,6 +5,7 @@ import asyncio
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from .application.dialogs import DialogKind, DialogState
 from .application.ui import CONTENT_BOTTOM, CONTENT_TOP, LocalUI, ScreenName, UIState
 from .config import load_config
 from .display.desktop_display import DesktopDisplay
@@ -30,6 +31,7 @@ class LocalUIRuntime:
     pending_control: str | None = None
     backend_state: UIState = field(default_factory=UIState)
     message: str | None = None
+    dialog: DialogState | None = None
 
 
 async def run(config_path: Path | None, display_mode: str, touch_mode: str) -> None:
@@ -88,7 +90,24 @@ async def run(config_path: Path | None, display_mode: str, touch_mode: str) -> N
                 event = await touch.read_event()
                 if event:
                     last_touch_at = now
-                    if _apply_touch(ui, runtime, event, now=now):
+                    if runtime.dialog:
+                        action = _apply_dialog_touch(runtime, event)
+                        if action == "cancel":
+                            runtime.dialog = None
+                            await _draw_screen(display, ui, runtime)
+                        elif action == "confirm":
+                            command = runtime.dialog.command
+                            payload = runtime.dialog.payload
+                            runtime.dialog = DialogState(DialogKind.BUSY, "Working", runtime.dialog.message)
+                            await _draw_screen(display, ui, runtime)
+                            result = await api.command(command or "", payload)
+                            runtime.dialog = DialogState(
+                                DialogKind.SUCCESS if result.get("ok") else DialogKind.ERROR,
+                                "Complete" if result.get("ok") else "Failed",
+                                result.get("message", "Command failed"),
+                            )
+                            await _draw_screen(display, ui, runtime)
+                    elif _apply_touch(ui, runtime, event, now=now):
                         await _draw_screen(display, ui, runtime)
                     if event.kind == "up" and runtime.pending_control:
                         command = runtime.pending_control
@@ -96,13 +115,25 @@ async def run(config_path: Path | None, display_mode: str, touch_mode: str) -> N
                         path = {
                             "home": "/commands/home", "stop": "/commands/stop", "estop": "/commands/estop",
                             "scan": "/network/scan", "export-logs": "/logs/export",
+                            "network": "/mode", "virtualhere": "/mode",
                             "restart-services": "/system/restart", "reboot": "/system/reboot", "shutdown": "/system/shutdown",
                         }.get(command)
-                        if path and runtime.backend_state.online:
+                        confirm = command in {"virtualhere", "network", "forget", "restart-services", "reboot", "shutdown", "export-logs"}
+                        if confirm:
+                            runtime.dialog = DialogState(
+                                DialogKind.CONFIRMATION,
+                                "Confirm action",
+                                f"Proceed with {command}?",
+                                confirm_label="Confirm",
+                                command=path,
+                                payload={"mode": command} if command in {"network", "virtualhere"} else None,
+                            )
+                            await _draw_screen(display, ui, runtime)
+                        elif path and runtime.backend_state.online:
                             result = await api.command(path)
                             runtime.message = result.get("message")
                             await _draw_screen(display, ui, runtime)
-                elif _should_return_home(runtime.screen, last_touch_at, now):
+                elif runtime.dialog is None and _should_return_home(runtime.screen, last_touch_at, now):
                     runtime.screen = "home"
                     runtime.scroll_y = 0
                     await _draw_screen(display, ui, runtime)
@@ -118,7 +149,7 @@ async def _draw_screen(display: Display, ui: LocalUI, runtime: LocalUIRuntime) -
         0,
         display.width,
         display.height,
-        ui.render(runtime.screen, scroll_y=runtime.scroll_y, state=runtime.backend_state),
+        ui.render(runtime.screen, scroll_y=runtime.scroll_y, state=runtime.backend_state, dialog=runtime.dialog),
     )
 
 
@@ -127,6 +158,19 @@ def _screen_for_touch(ui: LocalUI, event: TouchEvent, current_screen: ScreenName
         return current_screen
     point = event.points[0]
     return ui.hit_nav(point.x, point.y) or current_screen
+
+
+def _apply_dialog_touch(runtime: LocalUIRuntime, event: TouchEvent) -> str | None:
+    if event.kind != "up" or not event.points or not runtime.dialog or runtime.dialog.kind == DialogKind.BUSY:
+        return None
+    if runtime.dialog.kind in {DialogKind.SUCCESS, DialogKind.ERROR}:
+        return "cancel"
+    point = event.points[0]
+    if 48 <= point.x < 218 and 184 <= point.y < 226:
+        return "cancel"
+    if 262 <= point.x < 432 and 184 <= point.y < 226:
+        return "confirm"
+    return None
 
 
 def _apply_touch(ui: LocalUI, runtime: LocalUIRuntime, event: TouchEvent, now: float = 0.0) -> bool:

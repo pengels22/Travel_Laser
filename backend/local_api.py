@@ -22,6 +22,7 @@ class LocalControllerAPI:
         app = web.Application()
         app.router.add_get("/state", self._state)
         app.router.add_get("/health", self._health)
+        app.router.add_get("/diagnostics", self._diagnostics)
         app.router.add_post("/commands/home", self._home)
         app.router.add_post("/commands/stop", self._stop)
         app.router.add_post("/commands/estop", self._estop)
@@ -51,6 +52,10 @@ class LocalControllerAPI:
     async def _health(self, _: web.Request) -> web.Response:
         snapshot = await self.state.snapshot()
         return web.json_response({"ok": True, "ready": snapshot.ready})
+
+    async def _diagnostics(self, _: web.Request) -> web.Response:
+        payload = await self.state.to_dict()
+        return web.json_response(payload.get("diagnostics", {}))
 
     async def _home(self, _: web.Request) -> web.Response:
         return await self._result(self.commands.home())
