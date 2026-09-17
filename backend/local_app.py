@@ -5,7 +5,7 @@ import asyncio
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .application.dialogs import DialogKind, DialogState
+from .application.dialogs import DialogKind, DialogState, KEYBOARD_ROWS, TextEntryState, keyboard_key_text
 from .application.ui import CONTENT_BOTTOM, CONTENT_TOP, LocalUI, ScreenName, UIState
 from .config import load_config
 from .display.desktop_display import DesktopDisplay
@@ -32,6 +32,10 @@ class LocalUIRuntime:
     backend_state: UIState = field(default_factory=UIState)
     message: str | None = None
     dialog: DialogState | None = None
+    entry: TextEntryState | None = None
+    networks: list[dict] = field(default_factory=list)
+    selected_ssid: str | None = None
+    system_detail: str | None = None
 
 
 async def run(config_path: Path | None, display_mode: str, touch_mode: str) -> None:
@@ -92,15 +96,27 @@ async def run(config_path: Path | None, display_mode: str, touch_mode: str) -> N
                     last_touch_at = now
                     if runtime.dialog:
                         action = _apply_dialog_touch(runtime, event)
+                        if action and action.startswith("key:") and runtime.entry:
+                            runtime.entry.insert(action[4:])
+                            await _draw_screen(display, ui, runtime)
+                            continue
+                        if action == "shift" and runtime.entry:
+                            runtime.entry.shift_enabled = not runtime.entry.shift_enabled
+                            await _draw_screen(display, ui, runtime)
+                            continue
                         if action == "cancel":
                             runtime.dialog = None
+                            runtime.entry = None
                             await _draw_screen(display, ui, runtime)
                         elif action == "confirm":
                             command = runtime.dialog.command
                             payload = runtime.dialog.payload
+                            if runtime.dialog.kind == DialogKind.KEYBOARD and runtime.entry:
+                                payload = {**(payload or {}), "password": runtime.entry.value}
                             runtime.dialog = DialogState(DialogKind.BUSY, "Working", runtime.dialog.message)
                             await _draw_screen(display, ui, runtime)
                             result = await api.command(command or "", payload)
+                            runtime.entry = None
                             runtime.dialog = DialogState(
                                 DialogKind.SUCCESS if result.get("ok") else DialogKind.ERROR,
                                 "Complete" if result.get("ok") else "Failed",
@@ -112,10 +128,15 @@ async def run(config_path: Path | None, display_mode: str, touch_mode: str) -> N
                     if event.kind == "up" and runtime.pending_control:
                         command = runtime.pending_control
                         runtime.pending_control = None
+                        if command in {"gpio", "usb", "spi-i2c", "logs"}:
+                            runtime.system_detail = command
+                            await _draw_screen(display, ui, runtime)
+                            continue
                         path = {
                             "home": "/commands/home", "stop": "/commands/stop", "estop": "/commands/estop",
                             "scan": "/network/scan", "export-logs": "/logs/export",
                             "network": "/mode", "virtualhere": "/mode",
+                            "forget": "/network/forget",
                             "restart-services": "/system/restart", "reboot": "/system/reboot", "shutdown": "/system/shutdown",
                         }.get(command)
                         confirm = command in {"virtualhere", "network", "forget", "restart-services", "reboot", "shutdown", "export-logs"}
@@ -126,11 +147,36 @@ async def run(config_path: Path | None, display_mode: str, touch_mode: str) -> N
                                 f"Proceed with {command}?",
                                 confirm_label="Confirm",
                                 command=path,
-                                payload={"mode": command} if command in {"network", "virtualhere"} else None,
+                                payload=(
+                                    {"mode": command} if command in {"network", "virtualhere"}
+                                    else {"ssid": runtime.selected_ssid or runtime.backend_state.wifi_ssid or ""}
+                                    if command == "forget" else None
+                                ),
                             )
                             await _draw_screen(display, ui, runtime)
+                        elif command.startswith("ssid:"):
+                            try:
+                                network = runtime.networks[int(command.split(":", 1)[1])]
+                            except (ValueError, IndexError):
+                                network = None
+                            if network:
+                                runtime.selected_ssid = str(network.get("ssid", ""))
+                                if (network.get("security") or "open") == "open":
+                                    runtime.dialog = DialogState(
+                                        DialogKind.CONFIRMATION, "Connect", f"Connect to {runtime.selected_ssid}?",
+                                        command="/network/connect", payload={"ssid": runtime.selected_ssid, "password": ""},
+                                    )
+                                else:
+                                    runtime.entry = TextEntryState(prompt=f"Password for {runtime.selected_ssid}")
+                                    runtime.dialog = DialogState(
+                                        DialogKind.KEYBOARD, "Wi-Fi password", runtime.entry.prompt,
+                                        confirm_label="Connect", command="/network/connect", payload={"ssid": runtime.selected_ssid},
+                                    )
+                                await _draw_screen(display, ui, runtime)
                         elif path and runtime.backend_state.online:
                             result = await api.command(path)
+                            if command == "scan" and result.get("ok"):
+                                runtime.networks = result.get("data", {}).get("networks", [])
                             runtime.message = result.get("message")
                             await _draw_screen(display, ui, runtime)
                 elif runtime.dialog is None and _should_return_home(runtime.screen, last_touch_at, now):
@@ -149,7 +195,7 @@ async def _draw_screen(display: Display, ui: LocalUI, runtime: LocalUIRuntime) -
         0,
         display.width,
         display.height,
-        ui.render(runtime.screen, scroll_y=runtime.scroll_y, state=runtime.backend_state, dialog=runtime.dialog),
+        ui.render(runtime.screen, scroll_y=runtime.scroll_y, state=runtime.backend_state, dialog=runtime.dialog, entry=runtime.entry, networks=runtime.networks, system_detail=runtime.system_detail),
     )
 
 
@@ -165,6 +211,26 @@ def _apply_dialog_touch(runtime: LocalUIRuntime, event: TouchEvent) -> str | Non
         return None
     if runtime.dialog.kind in {DialogKind.SUCCESS, DialogKind.ERROR}:
         return "cancel"
+    if runtime.dialog.kind == DialogKind.KEYBOARD:
+        point = event.points[0]
+        if 302 <= point.x < 380 and 228 <= point.y < 264:
+            return "cancel"
+        if 380 <= point.x < 460 and 228 <= point.y < 264:
+            return "confirm"
+        if 40 <= point.x < 100 and 228 <= point.y < 264:
+            return "shift"
+        if 100 <= point.x < 220 and 228 <= point.y < 264:
+            return "key: "
+        if 220 <= point.x < 302 and 228 <= point.y < 264:
+            if runtime.entry:
+                runtime.entry.backspace()
+            return None
+        if 40 <= point.x < 440 and 154 <= point.y < 244:
+            row_index = (point.y - 154) // 18
+            key_index = (point.x - 40) // 40
+            if 0 <= row_index < len(KEYBOARD_ROWS) and 0 <= key_index < min(10, len(KEYBOARD_ROWS[row_index])):
+                return "key:" + keyboard_key_text(KEYBOARD_ROWS[row_index][key_index], runtime.entry or TextEntryState())
+        return None
     point = event.points[0]
     if 48 <= point.x < 218 and 184 <= point.y < 226:
         return "cancel"
@@ -189,18 +255,20 @@ def _apply_touch(ui: LocalUI, runtime: LocalUIRuntime, event: TouchEvent, now: f
         if next_screen is not None:
             changed = next_screen != runtime.screen or runtime.scroll_y != 0
             runtime.screen = next_screen
+            if next_screen == "system":
+                runtime.system_detail = None
             runtime.scroll_y = 0
             runtime.drag_last_y = None
             runtime.drag_moved = False
             runtime.drag_pending_control = False
             runtime.drag_pending_started_at = 0.0
             return changed
-        if ui.hit_content_control(runtime.screen, point.x, point.y, runtime.scroll_y):
+        if ui.hit_content_control(runtime.screen, point.x, point.y, runtime.scroll_y, runtime.networks):
             runtime.drag_last_y = point.y
             runtime.drag_moved = False
             runtime.drag_pending_control = True
             runtime.drag_pending_started_at = now
-            runtime.pending_control = ui.hit_content_control(runtime.screen, point.x, point.y, runtime.scroll_y)
+            runtime.pending_control = ui.hit_content_control(runtime.screen, point.x, point.y, runtime.scroll_y, runtime.networks)
             return False
         if CONTENT_TOP <= point.y < CONTENT_BOTTOM:
             runtime.drag_last_y = point.y

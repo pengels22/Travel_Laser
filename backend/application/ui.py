@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 from typing import Literal
 
-from .dialogs import DialogKind, DialogState
+from .dialogs import DialogKind, DialogState, KEYBOARD_ROWS, TextEntryState
 
 
 BLACK = 0x0000
@@ -56,6 +56,7 @@ class UIState:
     current_mode: str = "network"
     camera_connected: bool = False
     faults: tuple[str, ...] = ()
+    diagnostics: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def from_payload(cls, payload: dict[str, Any], online: bool = True) -> "UIState":
@@ -92,6 +93,7 @@ class UIState:
             current_mode=str(mode.get("laser_mode", "network")),
             camera_connected=bool(camera.get("connected", False)),
             faults=tuple(faults),
+            diagnostics=payload.get("diagnostics", {}),
         )
 
 
@@ -111,7 +113,7 @@ class LocalUI:
             Button("STOP", 256, 82, 196, 142),
         )
 
-    def render(self, screen: ScreenName = "home", machine_state: str = "idle", scroll_y: int = 0, state: UIState | None = None, dialog: DialogState | None = None) -> bytes:
+    def render(self, screen: ScreenName = "home", machine_state: str = "idle", scroll_y: int = 0, state: UIState | None = None, dialog: DialogState | None = None, entry: TextEntryState | None = None, networks: list[dict] | None = None, system_detail: str | None = None) -> bytes:
         state = state or UIState(online=True, machine_state=machine_state)
         frame = RGB565Frame(self.width, self.height, BLACK)
         if screen == "home":
@@ -119,23 +121,38 @@ class LocalUI:
         elif screen == "status":
             self._draw_status(frame, scroll_y, state)
         elif screen == "net":
-            self._draw_network(frame, scroll_y, state)
+            self._draw_network(frame, scroll_y, state, networks or [])
         elif screen == "mode":
             self._draw_mode(frame, scroll_y, state)
         elif screen == "system":
-            self._draw_system(frame, scroll_y)
+            self._draw_system(frame, scroll_y, state, system_detail)
         self._draw_shell(frame, screen, state)
         if dialog:
-            self._draw_dialog(frame, dialog)
+            self._draw_dialog(frame, dialog, entry)
         return bytes(frame.data)
 
-    def _draw_dialog(self, frame: "RGB565Frame", dialog: DialogState) -> None:
+    def _draw_dialog(self, frame: "RGB565Frame", dialog: DialogState, entry: TextEntryState | None = None) -> None:
         frame.fill_rect(0, 44, self.width, 220, DARK)
         frame.rect(24, 60, 432, 184, RED if dialog.severity == "critical" else BLUE)
         frame.text(48, 78, dialog.title, WHITE, scale=2)
         frame.text(48, 116, dialog.message[:48], WHITE)
         if dialog.kind == DialogKind.BUSY:
             frame.text(48, 146, "Please wait...", MUTED)
+            return
+        if dialog.kind == DialogKind.KEYBOARD:
+            frame.text(48, 140, entry.display_value() if entry else "", WHITE, scale=2)
+            for row_index, row in enumerate(KEYBOARD_ROWS):
+                for key_index, key in enumerate(row[:10]):
+                    x = 40 + key_index * 40
+                    y = 154 + row_index * 18
+                    frame.fill_rect(x, y, 36, 16, PANEL)
+                    label = key.upper() if entry and entry.shift_enabled and key.isalpha() else key
+                    frame.text(x + 12, y + 5, label, WHITE)
+            frame.text(42, 248, "Shift", WHITE)
+            frame.text(142, 248, "Space", WHITE)
+            frame.text(238, 248, "<", WHITE)
+            frame.text(302, 248, "Cancel", WHITE)
+            frame.text(392, 248, "Go", WHITE)
             return
         frame.fill_rect(48, 184, 170, 42, DARK)
         frame.rect(48, 184, 170, 42, GRAY)
@@ -167,7 +184,7 @@ class LocalUI:
     def clamp_scroll(self, screen: ScreenName, scroll_y: int) -> int:
         return max(0, min(self.max_scroll(screen), scroll_y))
 
-    def hit_content_control(self, screen: ScreenName, x: int, y: int, scroll_y: int = 0) -> str | None:
+    def hit_content_control(self, screen: ScreenName, x: int, y: int, scroll_y: int = 0, networks: list[dict] | None = None) -> str | None:
         content_y = y + scroll_y
         if screen == "home":
             for button in self.home_actions:
@@ -175,6 +192,10 @@ class LocalUI:
                     return button.label.lower()
             return None
         if screen == "net":
+            for index in range(min(4, len(networks or []))):
+                row = Button(f"ssid:{index}", 34, 174 + index * 24, 410, 22)
+                if _contains(row, x, content_y):
+                    return row.label
             for button in (
                 Button("scan", 18, 260, 100, 36),
                 Button("connect", 130, 260, 110, 36),
@@ -265,7 +286,7 @@ class LocalUI:
             y += 28
         self._draw_scrollbar(frame, "status", scroll_y)
 
-    def _draw_network(self, frame: "RGB565Frame", scroll_y: int, state: UIState) -> None:
+    def _draw_network(self, frame: "RGB565Frame", scroll_y: int, state: UIState, networks: list[dict]) -> None:
         y_offset = -scroll_y
         frame.fill_rect(18, 56 + y_offset, 214, 74, PANEL)
         frame.rect(18, 56 + y_offset, 214, 74, GRAY)
@@ -282,13 +303,14 @@ class LocalUI:
         frame.fill_rect(18, 140 + y_offset, 444, 112, PANEL)
         frame.rect(18, 140 + y_offset, 444, 112, GRAY)
         frame.text(36, 160 + y_offset, "Available Wi-Fi Networks", MUTED)
-        networks = ("Workshop WiFi", "TravelLaser-Guest", "Office", "Other...")
         row_y = 174 + y_offset
-        for index, network in enumerate(networks):
+        shown_networks = networks or [{"ssid": "No scan results", "signal": None, "security": ""}]
+        for index, network in enumerate(shown_networks[:4]):
             color = BLUE if index == 0 else DARK
             frame.fill_rect(34, row_y, 410, 22, color)
-            frame.text(50, row_y + 8, network, WHITE)
-            frame.text(360, row_y + 8, "selected" if index == 0 else "locked", WHITE)
+            frame.text(50, row_y + 8, str(network.get("ssid", ""))[:24], WHITE)
+            security = network.get("security") or "open"
+            frame.text(360, row_y + 8, "open" if security == "open" else "locked", WHITE)
             row_y += 24
 
         toolbar = (
@@ -315,7 +337,10 @@ class LocalUI:
         frame.text(56, 178 + y_offset, "VirtualHere Service Mode", WHITE, scale=2)
         frame.text(56, 202 + y_offset, "ACTIVE" if state.current_mode == "virtualhere" else "Select to use", MUTED)
 
-    def _draw_system(self, frame: "RGB565Frame", scroll_y: int) -> None:
+    def _draw_system(self, frame: "RGB565Frame", scroll_y: int, state: UIState, detail: str | None = None) -> None:
+        if detail:
+            self._draw_system_detail(frame, state, detail)
+            return
         items = (
             "GPIO Status",
             "USB Identity",
@@ -333,6 +358,20 @@ class LocalUI:
             frame.text(48, y, item, WHITE, scale=2)
             y += 30
         self._draw_scrollbar(frame, "system", scroll_y)
+
+    def _draw_system_detail(self, frame: "RGB565Frame", state: UIState, detail: str) -> None:
+        frame.text(28, 62, "System / " + detail.upper(), WHITE, scale=2)
+        rows = {
+            "gpio": (("GPIO status", state.diagnostics.get("gpio_status", "UNVALIDATED")), ("Power Sense", "live state"), ("E-stop Sense", "live state"), ("K1 Relay", "live state")),
+            "usb": (("Laser USB", "connected" if state.laser_usb_connected else "NOT DETECTED"), ("Camera", "connected" if state.camera_connected else "NOT DETECTED")),
+            "spi-i2c": (("SPI device", state.diagnostics.get("spi_device") or "UNVALIDATED"), ("SPI status", state.diagnostics.get("spi_status", "UNVALIDATED")), ("I2C bus", str(state.diagnostics.get("i2c_bus") or "UNVALIDATED")), ("Touch", state.diagnostics.get("touch_status", "UNVALIDATED"))),
+            "logs": (("Event history", "See controller log"), ("Export", "Use Export Logs to USB")),
+        }.get(detail, (("Status", "UNVALIDATED"),))
+        y = 104
+        for label, value in rows:
+            frame.text(36, y, label, WHITE)
+            frame.text(260, y, str(value)[:24], MUTED)
+            y += 30
 
     def _draw_scrollbar(self, frame: "RGB565Frame", screen: ScreenName, scroll_y: int) -> None:
         max_scroll = self.max_scroll(screen)

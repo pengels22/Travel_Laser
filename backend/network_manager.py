@@ -8,6 +8,9 @@ from dataclasses import dataclass
 class WifiNetwork:
     ssid: str
     signal: int | None = None
+    security: str | None = None
+    connected: bool = False
+    saved: bool = False
 
 
 @dataclass
@@ -30,14 +33,17 @@ class NetworkManager:
         if self.dry_run:
             await asyncio.sleep(0)
             return []
-        output = await self._run_nmcli("-t", "-f", "SSID,SIGNAL", "device", "wifi", "list", "ifname", interface)
+        output = await self._run_nmcli("-t", "-f", "SSID,SIGNAL,SECURITY", "device", "wifi", "list", "ifname", interface)
         networks: list[WifiNetwork] = []
         for line in output.splitlines():
             if not line:
                 continue
-            ssid, _, signal = line.partition(":")
+            fields = line.split(":", 2)
+            ssid = fields[0]
             if ssid:
-                networks.append(WifiNetwork(ssid=ssid, signal=int(signal) if signal.isdigit() else None))
+                signal = fields[1] if len(fields) > 1 else ""
+                security = fields[2] if len(fields) > 2 and fields[2] else "open"
+                networks.append(WifiNetwork(ssid=ssid, signal=int(signal) if signal.isdigit() else None, security=security))
         return networks
 
     async def connect_wifi(self, ssid: str, password: str, interface: str | None = None) -> bool:

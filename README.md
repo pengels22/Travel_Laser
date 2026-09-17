@@ -168,6 +168,8 @@ Local API routes include `/state`, `/health`, `/diagnostics`, `/commands/home`, 
 
 Touchscreen confirmation, busy, success, error, and text-entry state are represented by reusable dialog models. Modal dialogs suppress page scrolling and suspend the idle-home timer. Manual log export searches only mounted USB filesystem partitions and writes a unique `Travel_Laser_Logs_<timestamp>` directory; it never selects the internal system disk.
 
+The Network screen consumes backend scan results, displays SSID/security information, opens the transient masked keyboard for secured networks, and sends Wi-Fi credentials only in the connect command payload. Mode, forget-network, export, restart, reboot, and shutdown actions require confirmation; E-stop, Stop, Home, and Scan do not.
+
 All local screens target `480x320` landscape:
 
 - Home: machine state plus two large same-priority controls, `HOME` and `STOP`.
