@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Travel-Laser Touchscreen Walkthrough</title>
+  <style>
+    :root { color-scheme: dark; font-family: system-ui, sans-serif; background: #111827; color: #f9fafb; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #111827; }
+    .stage { display: grid; gap: 14px; justify-items: center; }
+    .lcd { width: min(90vw, 720px); aspect-ratio: 3 / 2; background: #000; border: 8px solid #374151; border-radius: 8px; overflow: hidden; position: relative; box-shadow: 0 18px 50px #0008; }
+    .screen { width: 100%; height: 100%; display: grid; grid-template-rows: 44px 1fr 56px; background: #000; color: #fff; }
+    header { display: flex; align-items: center; padding: 0 12px; background: #2104; font-weight: 800; }
+    header .state { margin-left: auto; color: #4ade80; font-size: .8rem; }
+    main { overflow: auto; padding: 12px; display: grid; align-content: start; gap: 10px; }
+    nav { display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px; background: #2104; }
+    button, .row { border: 1px solid #632c; background: #2104; color: #fff; min-height: 34px; font: inherit; cursor: pointer; }
+    button:hover, .row:hover { background: #001f; }
+    button:disabled { opacity: .45; cursor: not-allowed; }
+    .hero-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; min-height: 150px; }
+    .hero-actions button { font-size: 1.6rem; font-weight: 800; }
+    .home { background: #16a34a; }
+    .stop, .danger { background: #dc2626; }
+    .panel { border: 1px solid #632c; padding: 10px; background: #18e4; }
+    .rows { display: grid; gap: 5px; }
+    .row { display: flex; justify-content: space-between; align-items: center; padding: 7px 10px; text-align: left; }
+    .muted { color: #bdf7; }
+    .good { color: #4ade80; } .warn { color: #fde047; } .bad { color: #f87171; }
+    .wifi-list { display: grid; gap: 4px; }
+    .wifi-list button { display: flex; justify-content: space-between; padding: 6px 10px; text-align: left; }
+    .toolbar { display: flex; gap: 6px; flex-wrap: wrap; }
+    .modal-shade { position: absolute; inset: 0; background: #000b; display: grid; place-items: center; padding: 24px; }
+    .modal { width: min(100%, 430px); border: 2px solid #001f; background: #2104; padding: 16px; display: grid; gap: 12px; }
+    .modal-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .keyboard { display: grid; gap: 4px; }
+    .keys { display: grid; grid-template-columns: repeat(10, 1fr); gap: 3px; }
+    .keys button { min-height: 28px; font-size: .8rem; }
+    input { width: 100%; box-sizing: border-box; background: #000; color: #fff; border: 1px solid #632c; padding: 8px; font: inherit; }
+    .help { color: #bdf7; font-size: .85rem; }
+  </style>
+</head>
+<body>
+  <div class="stage">
+    <div class="lcd" id="lcd"></div>
+    <div class="help">Offline development walkthrough. All backend responses are mocked in this file.</div>
+  </div>
+  <script>
+    const state = {
+      screen: "home", online: true, machine: "idle", homed: false, power: true, estop: false,
+      relay: true, usb: true, grbl: true, lightburn: false, mode: "network", wifi: "WorkshopWiFi",
+      wifiIp: "192.168.1.58", ethernetIp: "192.168.1.42", networks: [
+        { ssid: "WorkshopWiFi", signal: 92, security: "WPA2", saved: true },
+        { ssid: "TravelLaser-Guest", signal: 75, security: "WPA2", saved: false },
+        { ssid: "Open Workshop", signal: 61, security: "open", saved: false }
+      ], selected: null, dialog: null
+    };
+    const screens = ["home", "status", "net", "mode", "system"];
+    const lcd = document.getElementById("lcd");
+    const esc = value => String(value).replace(/[&<>\"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+    function apiResult(ok, message) { return { ok, message }; }
+    function command(path, payload = {}) {
+      if (path === "/commands/estop") { state.estop = true; state.relay = false; state.machine = "fault"; return apiResult(true, "E-stop active"); }
+      if (path === "/commands/stop") { state.homed = false; return apiResult(true, "Stop requested"); }
+      if (path === "/commands/home") { state.machine = "home"; state.homed = true; return apiResult(true, "Homing started"); }
+      if (path === "/mode") { state.mode = payload.mode; return apiResult(true, "Laser mode changed"); }
+      if (path === "/network/connect") { state.wifi = payload.ssid; state.wifiIp = "192.168.1.59"; return apiResult(true, "Connected"); }
+      if (path === "/network/forget") { state.networks = state.networks.filter(n => n.ssid !== payload.ssid); return apiResult(true, "Network forgotten"); }
+      if (path === "/logs/export") return apiResult(true, "Logs exported to USB");
+      return apiResult(true, "Command accepted");
+    }
+    function button(label, action, cls = "") { return `<button class="${cls}" data-action="${action}">${label}</button>`; }
+    function render() {
+      const body = renderScreen();
+      lcd.innerHTML = `<div class="screen"><header>Travel-Laser <span class="state ${state.online ? 'good' : 'bad'}">${state.online ? esc(state.machine.toUpperCase()) : 'OFFLINE'}</span></header><main>${body}</main><nav>${screens.map(s => button(s === 'net' ? 'Net' : s[0].toUpperCase() + s.slice(1), `nav:${s}`)).join('')}</nav></div>${state.dialog ? renderDialog() : ''}`;
+      lcd.querySelectorAll("[data-action]").forEach(el => el.addEventListener("click", () => handle(el.dataset.action)));
+      lcd.querySelectorAll("[data-ssid]").forEach(el => el.addEventListener("click", () => selectWifi(el.dataset.ssid)));
+    }
+    function renderScreen() {
+      if (!state.online) return `<section class="panel"><h2>CONTROLLER OFFLINE</h2><p>Machine control unavailable</p><p class="muted">Physical E-stop remains active</p></section>`;
+      if (state.screen === "home") return `<div class="hero-actions">${button('HOME','home','home')}${button('STOP','stop','stop')}</div><div class="muted">${state.grbl ? 'Ready to operate' : 'Waiting for laser'}</div>`;
+      if (state.screen === "status") return `<div class="rows">${[['GRBL State',state.machine],['LightBurn',state.lightburn?'Connected':'Disconnected'],['Power',state.power?'12V OK':'Off'],['E-stop Sense',state.estop?'Active':'OK'],['Safety Relay',state.relay?'Engaged':'Dropped'],['Laser USB',state.usb?'Connected':'Missing'],['Tailscale','UNVALIDATED']].map(([a,b])=>`<div class="row"><span>${a}</span><strong class="${b==='Connected'||b==='OK'||b==='Engaged'?'good':'warn'}">${b}</strong></div>`).join('')}</div>`;
+      if (state.screen === "net") return `<div class="panel"><strong>Ethernet</strong><div class="muted">${state.ethernetIp}</div></div><div class="panel"><strong>Wi-Fi: ${esc(state.wifi || 'Offline')}</strong><div class="muted">${state.wifiIp}</div></div><div class="wifi-list">${state.networks.map(n=>`<button data-ssid="${esc(n.ssid)}"><span>${esc(n.ssid)}</span><span>${n.signal}% ${esc(n.security)}</span></button>`).join('')}</div><div class="toolbar">${button('Scan','scan')}${button('Forget','forget')}</div>`;
+      if (state.screen === "mode") return `<div class="rows">${button('Network Mode','mode:network')}${button('VirtualHere Service Mode','mode:virtualhere')}</div><p class="muted">Current: ${esc(state.mode)}</p>`;
+      return `<div class="rows">${['hardware','network','usb','logs','services','power','about'].map(x=>button(x[0].toUpperCase()+x.slice(1),`system:${x}`)).join('')}</div>`;
+    }
+    function renderDialog() {
+      const d = state.dialog;
+      if (d.type === 'keyboard') return `<div class="modal-shade"><div class="modal"><h3>${esc(d.title)}</h3><input id="password" type="password" value="${esc(d.value)}" readonly><div class="keyboard">${['1234567890','qwertyuiop','asdfghjkl','zxcvbnm','!@#$%^&*()'].map(row=>`<div class="keys">${[...row].map(k=>`<button data-action="key:${esc(k)}">${k}</button>`).join('')}</div>`).join('')}</div><div class="modal-actions">${button('Cancel','dialog:cancel')}${button('Connect','dialog:connect','home')}</div></div></div>`;
+      return `<div class="modal-shade"><div class="modal"><h3>${esc(d.title)}</h3><p>${esc(d.message)}</p>${d.type==='busy'?'<p class="muted">Please wait...</p>':''}<div class="modal-actions">${d.type==='busy'?'':button('Cancel','dialog:cancel')}${button(d.type==='confirm'?'Confirm':'OK',d.type==='confirm'?'dialog:confirm':'dialog:cancel','home')}</div></div></div>`;
+    }
+    function selectWifi(ssid) { const n = state.networks.find(x=>x.ssid===ssid); state.selected=ssid; if ((n.security||'open') === 'open') state.dialog={type:'confirm',title:'Connect',message:`Connect to ${ssid}?`}; else state.dialog={type:'keyboard',title:'Wi-Fi password',message:ssid,value:''}; render(); }
+    function handle(action) {
+      if (action.startsWith('nav:')) { state.screen=action.slice(4); render(); return; }
+      if (action==='home'||action==='stop'||action==='scan') { if(action==='scan') state.dialog={type:'busy',title:'Scanning Wi-Fi',message:'Please wait...'}; else { const r=command(`/commands/${action}`); state.dialog={type:'success',title:'Complete',message:r.message}; } render(); return; }
+      if (action==='estop') { command('/commands/estop'); render(); return; }
+      if (action==='forget') { state.dialog={type:'confirm',title:'Forget Wi-Fi network?',message:state.selected || state.wifi}; render(); return; }
+      if (action.startsWith('mode:')) { const mode=action.slice(5); state.dialog={type:'confirm',title:'Switch mode?',message:`Change to ${mode}?`,mode}; render(); return; }
+      if (action.startsWith('system:')) { const item=action.slice(7); if(item==='logs') state.dialog={type:'confirm',title:'Export logs?',message:'Insert a writable USB drive first.'}; else if(['services','power'].includes(item)) state.dialog={type:'confirm',title:item==='services'?'Restart controller?':item==='power'?'Reboot or shutdown?':'Confirm',message:'This is a simulated maintenance action.'}; else state.dialog={type:'success',title:item.toUpperCase(),message:'Diagnostics are backend-derived and currently unvalidated.'}; render(); return; }
+      if (action.startsWith('key:')) { if(state.dialog?.type==='keyboard') state.dialog.value += action.slice(4); render(); return; }
+      if (action==='dialog:cancel') { state.dialog=null; render(); return; }
+      if (action==='dialog:connect') { const r=command('/network/connect',{ssid:state.selected,password:state.dialog.value}); state.dialog={type:r.ok?'success':'error',title:r.ok?'Connected':'Failed',message:r.message}; render(); return; }
+      if (action==='dialog:confirm') { const d=state.dialog; const r=d.mode ? command('/mode',{mode:d.mode}) : d.message.startsWith('Forget') ? command('/network/forget',{ssid:state.selected||state.wifi}) : command('/logs/export'); state.dialog={type:r.ok?'success':'error',title:r.ok?'Complete':'Failed',message:r.message}; render(); }
+    }
+    render();
+  </script>
+</body>
+</html>

@@ -56,6 +56,15 @@ Render the local UI to a development framebuffer file:
 open .state/display.ppm
 ```
 
+Open the clickable browser walkthrough for fast UI development:
+
+```bash
+python3 -m http.server 4173 --directory dev
+open http://127.0.0.1:4173/touchscreen-walkthrough.html
+```
+
+The walkthrough is a mock frontend, not a hardware emulator. It mirrors the native 480x320 screen order, labels, modal flows, keyboard interaction, Wi-Fi selection, mode confirmation, and System navigation. When changing touchscreen screens or controls, update both `backend/application/ui.py` and `dev/touchscreen-walkthrough.html`, then run the test suite.
+
 The local UI is designed for the LCD's `480x320` landscape dimensions. The native display renderer uses the same screen order, labels, colors, control layout, and scrollable content behavior defined in this README, with simple pixel-font drawing for the ST7796U framebuffer.
 
 GRBL network mode is fixed to TCP port `23` for deployment. On macOS and many Linux systems, binding to port 23 may require elevated privileges; for local development, use a copied config with a high TCP port.
