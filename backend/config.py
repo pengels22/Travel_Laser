@@ -40,10 +40,10 @@ class DisplayHardwareConfig:
     width: int = 480
     height: int = 320
     rotation: int = 90
-    spi_device: str | None = None
-    spi_speed_hz: int = 24_000_000
-    dc_gpio_chip: str | None = None
-    dc_gpio_line: int | None = None
+    spi_device: str | None = "/dev/spidev1.1"
+    spi_speed_hz: int = 10_000_000
+    dc_gpio_chip: str | None = "/dev/gpiochip1"
+    dc_gpio_line: int | None = 70
     reset_gpio_chip: str | None = None
     reset_gpio_line: int | None = None
     backlight_gpio_chip: str | None = None
@@ -53,10 +53,10 @@ class DisplayHardwareConfig:
 @dataclass
 class TouchHardwareConfig:
     controller: str = "FT6336U"
-    i2c_bus: int | None = None
+    i2c_bus: int | None = 2
     i2c_address: int = 0x38
-    reset_gpio_chip: str | None = None
-    reset_gpio_line: int | None = None
+    reset_gpio_chip: str | None = "/dev/gpiochip1"
+    reset_gpio_line: int | None = 69
     interrupt_gpio_chip: str | None = None
     interrupt_gpio_line: int | None = None
     rotation: int = 90
@@ -111,7 +111,7 @@ class LoggingConfig:
 @dataclass
 class NetworkConfig:
     uplink_wifi_interface: str = "wlan0"
-    ethernet_interface: str = "eth0"
+    ethernet_interface: str = "end0"
     tailscale_interface: str = "tailscale0"
     tailscale_ip: str | None = None
     tailscale_enabled: bool = True
@@ -185,22 +185,22 @@ def config_from_dict(raw: dict[str, Any]) -> AppConfig:
             width=int(display.get("width", 480)),
             height=int(display.get("height", 320)),
             rotation=int(display.get("rotation", 90)),
-            spi_device=display.get("spi_device"),
-            spi_speed_hz=int(display.get("spi_speed_hz", 24_000_000)),
-            dc_gpio_chip=display.get("dc_gpio_chip"),
-            dc_gpio_line=_optional_int(display.get("dc_gpio_line")),
-            reset_gpio_chip=display.get("reset_gpio_chip"),
+            spi_device=_optional_str(display.get("spi_device", "/dev/spidev1.1")),
+            spi_speed_hz=int(display.get("spi_speed_hz", 10_000_000)),
+            dc_gpio_chip=_optional_str(display.get("dc_gpio_chip", "/dev/gpiochip1")),
+            dc_gpio_line=_optional_int(display.get("dc_gpio_line", 70)),
+            reset_gpio_chip=_optional_str(display.get("reset_gpio_chip")),
             reset_gpio_line=_optional_int(display.get("reset_gpio_line")),
-            backlight_gpio_chip=display.get("backlight_gpio_chip"),
+            backlight_gpio_chip=_optional_str(display.get("backlight_gpio_chip")),
             backlight_gpio_line=_optional_int(display.get("backlight_gpio_line")),
         ),
         touch=TouchHardwareConfig(
             controller=str(touch.get("controller", "FT6336U")),
-            i2c_bus=_optional_int(touch.get("i2c_bus")),
+            i2c_bus=_optional_int(touch.get("i2c_bus", 2)),
             i2c_address=int(str(touch.get("i2c_address", "0x38")), 0),
-            reset_gpio_chip=touch.get("reset_gpio_chip"),
-            reset_gpio_line=_optional_int(touch.get("reset_gpio_line")),
-            interrupt_gpio_chip=touch.get("interrupt_gpio_chip"),
+            reset_gpio_chip=_optional_str(touch.get("reset_gpio_chip", "/dev/gpiochip1")),
+            reset_gpio_line=_optional_int(touch.get("reset_gpio_line", 69)),
+            interrupt_gpio_chip=_optional_str(touch.get("interrupt_gpio_chip")),
             interrupt_gpio_line=_optional_int(touch.get("interrupt_gpio_line")),
             rotation=int(touch.get("rotation", display.get("rotation", 90))),
         ),
@@ -229,7 +229,7 @@ def config_from_dict(raw: dict[str, Any]) -> AppConfig:
         ),
         network=NetworkConfig(
             uplink_wifi_interface=str(network.get("uplink_wifi", {}).get("interface", "wlan0")),
-            ethernet_interface=str(network.get("ethernet", {}).get("interface", "eth0")),
+            ethernet_interface=str(network.get("ethernet", {}).get("interface", "end0")),
             tailscale_interface=str(network.get("tailscale", {}).get("interface", "tailscale0")),
             tailscale_ip=_optional_str(network.get("tailscale", {}).get("ip_address")),
             tailscale_enabled=_as_bool(network.get("tailscale", {}).get("enabled", True)),
@@ -253,7 +253,7 @@ def _usb_identity(raw: dict[str, Any]) -> USBIdentity:
 def _gpio_line(raw: dict[str, Any]) -> GPIOLineConfig:
     line = raw.get("line")
     return GPIOLineConfig(
-        chip=raw.get("chip"),
+        chip=_optional_str(raw.get("chip")),
         line=None if line is None else int(line),
         board_pin=raw.get("board_pin"),
         active_high=_as_bool(raw.get("active_high", True)),
@@ -262,7 +262,7 @@ def _gpio_line(raw: dict[str, Any]) -> GPIOLineConfig:
 
 
 def _optional_int(value: Any) -> int | None:
-    if value is None:
+    if value is None or value == "":
         return None
     return int(str(value), 0)
 

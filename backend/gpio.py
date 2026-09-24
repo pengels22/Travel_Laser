@@ -34,12 +34,11 @@ class MockGPIOBackend:
 
 
 class LinuxGPIOBackend:
-    """Config-driven libgpiod backend for Orange Pi GPIO."""
+    """Config-driven libgpiod v2 backend for Orange Pi GPIO."""
 
     def __init__(self, config: GPIOConfig) -> None:
         self.config = config
-        self._chip = None
-        self._lines: dict[str, object] = {}
+        self._requests: dict[str, object] = {}
 
     async def initialize_safe(self) -> None:
         self._ensure_requested()
@@ -54,51 +53,115 @@ class LinuxGPIOBackend:
     async def set_k1(self, energized: bool) -> None:
         await self._write("k1_output", self.config.k1_output, energized)
 
+    def close(self) -> None:
+        for request in self._requests.values():
+            release = getattr(request, "release", None)
+            if release is not None:
+                release()
+        self._requests.clear()
+
     def _ensure_requested(self) -> None:
+        if self._requests:
+            return
+
         try:
             import gpiod
+            from gpiod.line import Direction, Value
         except ImportError as exc:
-            raise RuntimeError("LinuxGPIOBackend requires python3-libgpiod or the gpiod Python package") from exc
+            raise RuntimeError("LinuxGPIOBackend requires libgpiod Python v2 bindings") from exc
 
-        chip_name = self.config.k1_output.chip
-        if not chip_name:
-            raise ValueError("GPIO chip is required for LinuxGPIOBackend")
-        self._chip = gpiod.Chip(chip_name)
-        self._request_input(gpiod, "power_input", self.config.power_input)
-        self._request_input(gpiod, "estop_input", self.config.estop_input)
-        self._request_output(gpiod, "k1_output", self.config.k1_output, False)
+        self._requests["power_input"] = self._request_input(
+            gpiod,
+            Direction,
+            self.config.power_input,
+            "travel-laser-power-input",
+        )
+        self._requests["estop_input"] = self._request_input(
+            gpiod,
+            Direction,
+            self.config.estop_input,
+            "travel-laser-estop-input",
+        )
 
-    def _request_input(self, gpiod, name: str, line_config: GPIOLineConfig) -> None:
-        line = self._get_line(line_config)
-        line.request(consumer="travel-laser-controller", type=gpiod.LINE_REQ_DIR_IN)
-        self._lines[name] = line
+        k1 = self.config.k1_output
+        self._validate_line(k1, "k1_output")
+        self._requests["k1_output"] = gpiod.request_lines(
+            _chip_path(k1.chip),
+            consumer="travel-laser-k1-output",
+            config={
+                k1.line: gpiod.LineSettings(
+                    direction=Direction.OUTPUT,
+                    output_value=Value.ACTIVE
+                    if self._physical_value(k1, False)
+                    else Value.INACTIVE,
+                )
+            },
+        )
 
-    def _request_output(self, gpiod, name: str, line_config: GPIOLineConfig, energized: bool) -> None:
-        line = self._get_line(line_config)
-        physical = self._physical_value(line_config, energized)
-        line.request(consumer="travel-laser-controller", type=gpiod.LINE_REQ_DIR_OUT, default_vals=[physical])
-        self._lines[name] = line
+    def _request_input(self, gpiod, Direction, line_config: GPIOLineConfig, consumer: str):
+        from gpiod.line import Bias
 
-    def _get_line(self, line_config: GPIOLineConfig):
-        if self._chip is None:
-            raise RuntimeError("GPIO chip is not open")
-        if line_config.line is None:
-            raise ValueError(f"GPIO line is required for {line_config.board_pin or 'unnamed line'}")
-        return self._chip.get_line(line_config.line)
+        self._validate_line(line_config, consumer)
+        settings_kwargs = {"direction": Direction.INPUT}
+        bias = _bias_value(Bias, line_config.bias)
+        if bias is not None:
+            settings_kwargs["bias"] = bias
+
+        return gpiod.request_lines(
+            _chip_path(line_config.chip),
+            consumer=consumer,
+            config={
+                line_config.line: gpiod.LineSettings(**settings_kwargs)
+            },
+        )
 
     async def _read(self, name: str, line_config: GPIOLineConfig) -> bool:
         await asyncio.sleep(0)
-        line = self._lines[name]
-        physical = bool(line.get_value())
+        self._ensure_requested()
+
+        from gpiod.line import Value
+
+        request = self._requests[name]
+        physical = request.get_value(line_config.line) == Value.ACTIVE
         return physical if line_config.active_high else not physical
 
     async def _write(self, name: str, line_config: GPIOLineConfig, energized: bool) -> None:
         await asyncio.sleep(0)
-        if not self._lines:
-            self._ensure_requested()
-        line = self._lines[name]
-        line.set_value(self._physical_value(line_config, energized))
+        self._ensure_requested()
 
-    def _physical_value(self, line_config: GPIOLineConfig, logical: bool) -> int:
-        value = logical if line_config.active_high else not logical
-        return 1 if value else 0
+        from gpiod.line import Value
+
+        request = self._requests[name]
+        physical = self._physical_value(line_config, energized)
+        request.set_value(
+            line_config.line,
+            Value.ACTIVE if physical else Value.INACTIVE,
+        )
+
+    @staticmethod
+    def _physical_value(line_config: GPIOLineConfig, logical: bool) -> bool:
+        return logical if line_config.active_high else not logical
+
+    @staticmethod
+    def _validate_line(line_config: GPIOLineConfig, name: str) -> None:
+        if not line_config.chip:
+            raise ValueError(f"GPIO chip is required for {name}")
+        if line_config.line is None:
+            raise ValueError(f"GPIO line is required for {line_config.board_pin or name}")
+
+
+def _chip_path(chip: str | None) -> str:
+    if not chip:
+        raise ValueError("GPIO chip is required")
+    return chip if chip.startswith("/") else f"/dev/{chip}"
+
+
+def _bias_value(Bias, value: str):
+    normalized = value.strip().lower()
+    if normalized in {"", "none", "disabled"}:
+        return Bias.DISABLED
+    if normalized in {"pull-up", "pull_up", "up"}:
+        return Bias.PULL_UP
+    if normalized in {"pull-down", "pull_down", "down"}:
+        return Bias.PULL_DOWN
+    raise ValueError(f"unsupported GPIO bias: {value}")
