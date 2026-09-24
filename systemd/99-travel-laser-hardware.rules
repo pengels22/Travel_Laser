@@ -1,0 +1,6 @@
+# Travel-Laser hardware access.
+# Narrow permissions to only the validated devices used by the application.
+
+SUBSYSTEM=="spidev", KERNEL=="spidev1.1", GROUP="spi", MODE="0660"
+SUBSYSTEM=="i2c-dev", KERNEL=="i2c-2", GROUP="i2c", MODE="0660"
+SUBSYSTEM=="gpio", KERNEL=="gpiochip1", GROUP="gpio", MODE="0660"

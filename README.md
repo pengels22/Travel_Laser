@@ -1,39 +1,291 @@
 # travel-laser-controller
 
-Orange Pi Zero 3 laser controller for the Travel-Laser build.
+Orange Pi Zero 3 controller for the Travel-Laser build.
 
-Active deployment path:
+Active path:
 
 ```text
 LightBurn -> TCP port 23 -> Orange Pi GRBL proxy -> USB serial -> laser controller
 Orange Pi -> SPI ST7796U display + I2C FT6336U touch -> local 480x320 UI
 ```
 
-LightBurn connects to the Travel-Laser IP address shown on the local touchscreen Network page using GRBL/TCP port `23`.
+The vendor TS1 controller/display is retired from the active design.
 
-Service mode remains available through VirtualHere, but the GRBL proxy and VirtualHere must never own the laser USB device at the same time.
+## Validated Orange Pi Hardware
 
-## Current Status
+Validated on:
 
-Implemented:
+```text
+Orange Pi Zero 3
+Armbian_community 26.11.0-trunk.52 trixie
+Debian 13
+Linux 6.18.52-current-sunxi64
+```
 
-- Asyncio Python backend package.
-- Central asyncio-safe controller state.
-- Mock GPIO backend and config-driven Linux GPIO backend.
-- Safety controller for the single K1 hard E-stop relay.
-- Mockable GRBL TCP proxy with realtime command injection.
-- Network vs VirtualHere mode manager with persistent mode file.
-- aiohttp web portal with camera viewer, HOME, E-STOP, and compact LASER OK/FAULT status.
-- NetworkManager-backed `wlan0` Wi-Fi scan/connect/forget actions.
-- MediaMTX/FFmpeg WebRTC camera service integration.
-- Display/touch abstraction layer with desktop framebuffer, ST7796U SPI, and FT6336U I2C implementations.
-- Local touchscreen app entry point with Home, Status, Net, Mode, and System screens plus diagnostics utilities.
-- Automatic USB log export when a filesystem flash drive larger than 200 MB is inserted.
-- LightBurn TCP/GRBL network setup through TCP port `23`.
+Current Linux device mapping:
 
-The Orange Pi touchscreen is a local control/status panel only. Camera viewing is web UI only, and the project does not expect LightBurn-specific metadata such as file name, job name, layer names, artwork preview, or estimated time remaining. The Pi does not store or launch local job files; jobs always originate from the external computer through LightBurn/GRBL.
+```text
+Main H618 GPIO: /dev/gpiochip1
+SPI1 display:   /dev/spidev1.1
+I2C3 touch:     /dev/i2c-2
+Touch address:  0x38
+Ethernet:       end0
+Wi-Fi:          wlan0
+```
 
-User-facing touchscreen labels should use common names such as `Power`, `E-stop Sense`, `Safety Relay`, and `Laser USB`; PC/GPIO names stay in hardware/config documentation.
+### Display
+
+Hosyond 3.5-inch IPS capacitive touch module, ASIN `B0CMD7Y55M`.
+
+ST7796U settings physically validated:
+
+```text
+Native panel:     320x480
+Application:      480x320 landscape
+SPI:              SPI1 CS1
+SPI speed:        10 MHz validated
+Pixel format:     RGB565
+Landscape MADCTL: 0x28
+Display inversion: ON (0x21)
+```
+
+Wiring:
+
+| LCD signal | Orange Pi signal | SoC pin | Header pin | Linux/config |
+| --- | --- | --- | ---: | --- |
+| VCC | 5 V | n/a | 2 or 4 | n/a |
+| GND | Ground | n/a | 6 | n/a |
+| SCK | SPI1 CLK | PH6 | 23 | `/dev/spidev1.1` |
+| MOSI | SPI1 MOSI | PH7 | 19 | `/dev/spidev1.1` |
+| MISO | SPI1 MISO | PH8 | 21 | `/dev/spidev1.1` |
+| LCD_CS | SPI1 CS1 | PH9 | 24 | `/dev/spidev1.1` |
+| LCD_DC | GPIO | PC6 | 11 | `/dev/gpiochip1`, line 70 |
+| LCD_RST | GPIO | PC9 | 7 | physically connected only; do not claim in userspace |
+
+PC9/GPIO73 is reserved by the Orange Pi Zero 3 PMIC interrupt on the validated kernel. The display works without userspace hardware-reset control.
+
+### Touch
+
+FT6336U settings physically validated:
+
+```text
+I2C bus:    /dev/i2c-2
+Address:    0x38
+CTP_RST:    /dev/gpiochip1 line 69 / PC5 / pin 13
+Landscape:  x = raw_y
+            y = 319 - raw_x
+```
+
+I2C3 wiring:
+
+| Touch signal | Orange Pi signal | SoC pin | Header pin |
+| --- | --- | --- | ---: |
+| CTP_SCL | I2C3 SCL | PH4 | 5 |
+| CTP_SDA | I2C3 SDA | PH5 | 3 |
+| CTP_RST | GPIO | PC5 | 13 |
+
+The application polls touch over I2C, so CTP_INT is not required.
+
+## Touch Interrupt
+
+CTP_INT is not used in this build. The FT6336U backend polls the controller over I2C, so the production configuration leaves:
+
+```text
+touch.interrupt_gpio_chip: null
+touch.interrupt_gpio_line: null
+```
+
+PC8/GPIO72 therefore remains dedicated to the K1 hard E-stop relay output.
+
+## SPI/I2C Boot Configuration
+
+The validated Armbian boot environment uses:
+
+```text
+overlays=i2c3-ph spidev1_1
+user_overlays=spi1-cs1-pins
+```
+
+The normal `spidev1_1` overlay creates `/dev/spidev1.1`, but on this image it did not assign the physical SPI1 header pins. The repository therefore contains:
+
+```text
+hardware/overlays/spi1-cs1-pins.dts
+scripts/configure-display-buses.sh
+```
+
+Run once if the machine is not already configured:
+
+```bash
+sudo apt install -y device-tree-compiler
+sudo ./scripts/configure-display-buses.sh
+sudo reboot
+```
+
+After reboot verify:
+
+```bash
+ls -l /dev/spidev1.1 /dev/i2c-2
+
+sudo grep -E 'PH6|PH7|PH8|PH9' \
+  /sys/kernel/debug/pinctrl/300b000.pinctrl/pinmux-pins
+```
+
+Expected SPI1 pinmux:
+
+```text
+PH6 -> spi1
+PH7 -> spi1
+PH8 -> spi1
+PH9 -> spi1
+```
+
+## GPIO Safety Hardware
+
+Existing Travel-Laser project GPIO assignments:
+
+| Function | SoC pin | Linux line | Header pin | Direction |
+| --- | --- | ---: | ---: | --- |
+| Power sense | PC14 | 78 | 18 | Input |
+| E-stop sense | PC15 | 79 | 16 | Input |
+| K1 relay | PC8 | 72 | 15 | Output |
+
+These are configured on `/dev/gpiochip1` on the validated Armbian image.
+
+PC14/PC15 are deterministic external sense signals and use `bias: none`.
+
+## Software Architecture
+
+`travel-laser-controller` owns:
+
+- safety state;
+- K1;
+- GRBL serial/TCP proxy;
+- USB discovery;
+- networking;
+- mode management;
+- logging;
+- web/API state.
+
+`travel-laser-ui` owns:
+
+- ST7796U rendering;
+- FT6336U touch;
+- local 480x320 UI;
+- loopback API client.
+
+The local touchscreen API binds only to `127.0.0.1:8081`.
+
+The external web portal is intended to bind to the configured Tailscale IPv4 address on port `8080`.
+
+LightBurn uses GRBL/TCP port `23`.
+
+## Display Driver Notes
+
+`backend/display/st7796_display.py` uses:
+
+- Linux `spidev`;
+- libgpiod v2 for LCD_DC and optional GPIO lines;
+- validated ST7796U initialization;
+- 10 MHz SPI by default;
+- inversion command `0x21`;
+- RGB565.
+
+LCD hardware reset is optional. On this Orange Pi it is deliberately disabled in config because PC9 is reserved by the PMIC.
+
+## Touch Driver Notes
+
+`backend/input/ft6336_touch.py`:
+
+- uses `/dev/i2c-2`;
+- reads device `0x38`;
+- pulses CTP_RST through `/dev/gpiochip1` line 69;
+- polls rather than depending on CTP_INT;
+- maps portrait raw coordinates to 480x320 landscape.
+
+## libgpiod Version
+
+The validated system provides libgpiod 2.2.x. Runtime GPIO code uses the v2 `request_lines()` API.
+
+The installer creates the Python virtual environment with:
+
+```bash
+python3 -m venv --system-site-packages .venv
+```
+
+so the Debian `python3-libgpiod` package is available inside the application venv.
+
+## Device Permissions
+
+The app runs as the `travel-laser` service user rather than root.
+
+`systemd/99-travel-laser-hardware.rules` grants group access only to the validated hardware nodes:
+
+```text
+/dev/spidev1.1 -> spi group
+/dev/i2c-2     -> i2c group
+/dev/gpiochip1 -> gpio group
+```
+
+The installer adds the service user to `gpio`, `i2c`, and `spi`.
+
+## Installation
+
+```bash
+sudo apt-get update
+sudo ./scripts/install.sh
+```
+
+If boot overlays have not already been configured:
+
+```bash
+sudo ./scripts/configure-display-buses.sh
+sudo reboot
+```
+
+Then verify:
+
+```bash
+ls -l /dev/spidev1.1 /dev/i2c-2 /dev/gpiochip1
+sudo /usr/sbin/i2cdetect -y 2
+```
+
+Address `38` should appear in the I2C scan.
+
+## Diagnostics
+
+```bash
+.venv/bin/python scripts/diagnostics/hardware_info.py \
+  --config /etc/travel-laser/controller.yaml
+
+.venv/bin/python scripts/diagnostics/display_test.py \
+  --config /etc/travel-laser/controller.yaml \
+  --display st7796
+
+.venv/bin/python scripts/diagnostics/touch_test.py \
+  --config /etc/travel-laser/controller.yaml
+```
+
+The display diagnostic should render correct red, green, blue, white, and black colors in the correct 480x320 landscape orientation.
+
+## Networking
+
+Validated interface names:
+
+```text
+Ethernet: end0
+Wi-Fi:    wlan0
+```
+
+Preferred route metrics:
+
+```text
+end0  = 100
+wlan0 = 300
+```
+
+The Pi may have simultaneous addresses on Trusted Ethernet and IoT Wi-Fi during bring-up. Do not broaden firewall rules as a shortcut.
+
+Remote administration should use Tailscale and the existing subnet-router path rather than WAN exposure.
 
 ## Development
 
@@ -46,314 +298,44 @@ python3 -m venv .venv
 Run backend in mock mode:
 
 ```bash
-.venv/bin/travel-laser-controller --mock --config config/controller.example.yaml
+.venv/bin/travel-laser-controller \
+  --mock \
+  --config config/controller.example.yaml
 ```
 
-Render the local UI to a development framebuffer file:
+Render the UI to a development framebuffer:
 
 ```bash
-.venv/bin/travel-laser-ui --config config/controller.example.yaml --display desktop --touch none
-open .state/display.ppm
+.venv/bin/travel-laser-ui \
+  --config config/controller.example.yaml \
+  --display desktop \
+  --touch none
 ```
-
-Open the clickable browser walkthrough for fast UI development:
-
-```bash
-python3 -m http.server 4173 --directory dev
-open http://127.0.0.1:4173/touchscreen-walkthrough.html
-```
-
-The walkthrough is a mock frontend, not a hardware emulator. It mirrors the native 480x320 screen order, labels, modal flows, keyboard interaction, Wi-Fi selection, mode confirmation, and System navigation. When changing touchscreen screens or controls, update both `backend/application/ui.py` and `dev/touchscreen-walkthrough.html`, then run the test suite.
-
-The local UI is designed for the LCD's `480x320` landscape dimensions. The native display renderer uses the same screen order, labels, colors, control layout, and scrollable content behavior defined in this README, with simple pixel-font drawing for the ST7796U framebuffer.
-
-GRBL network mode is fixed to TCP port `23` for deployment. On macOS and many Linux systems, binding to port 23 may require elevated privileges; for local development, use a copied config with a high TCP port.
 
 ## Safety Model
 
-- K1 is the only relay and is normally energized during operation.
-- K1 drops out on E-stop conditions, killing the laser controller completely.
-- E-stop sources include physical E-stop, local touchscreen E-stop, web E-stop, software E-stop, future fire logic, active LightBurn stream loss, and laser USB loss while K1 is expected on.
-- Software E-stop clears only after cycling the physical E-stop input from active back to OK.
-- No job auto-resume is implemented after E-stop, reboot, power failure, controller reset, or unexpected laser USB loss.
-- Camera loss is non-fatal.
+- K1 is the hard E-stop relay.
+- No automatic job resume after E-stop, reboot, power loss, controller reset, or unexpected laser USB loss.
+- Network and VirtualHere modes must never own the laser USB device simultaneously.
+- Camera failure is non-fatal.
+- Fire logic remains disabled until real fire hardware is present.
 
-## Orange Pi Pinout
+## Deployment
 
-| Function | Orange Pi pin | Linux GPIO | Header pin | Direction | Active state |
-| --- | --- | ---: | ---: | --- | --- |
-| Power sense input | PC14 | 78 | 18 | Input | High = laser input power present |
-| E-stop power sense input | PC15 | 79 | 16 | Input | High = OK, low = E-stop active |
-| K1 hard E-stop relay | PC8 | 72 | 15 | Output | Active high |
+`config/deployment.env.example` defaults to `START_SERVICES=true`.
 
-These project GPIOs are configured on `gpiochip0`. PC14 and PC15 use `bias: none` because the sense signals are deterministic high/low from the wiring.
-
-## Display And Touch
-
-Target module: Hosyond 3.5-inch IPS capacitive touch LCD, ASIN `B0CMD7Y55M`.
-
-| Module function | Driver | Bus | Config key | Status |
-| --- | --- | --- | --- | --- |
-| LCD | ST7796U | SPI1 | `display.spi_device` | SPI1 CS/MOSI/MISO/CLK on PH9/PH7/PH8/PH6, pins 24/19/21/23, verify `/dev/spidev1.0` |
-| Touch | FT6336U | I2C3 | `touch.i2c_bus`, `touch.i2c_address` | I2C3 SDA/SCL on PH5/PH4, pins 3/5, verify `/dev/i2c-3` |
-| D/C | GPIO | GPIO | `display.dc_gpio_line` | PC6 / GPIO 70 / physical pin 11 |
-| RESET | GPIO | GPIO | `display.reset_gpio_line` | PC9 / GPIO 73 / physical pin 7 |
-| Backlight | GPIO | GPIO | `display.backlight_gpio_line` | Pending: choose final pin or tie on |
-| Touch reset | GPIO | GPIO | `touch.reset_gpio_line` | PC5 / GPIO 69 / physical pin 13 |
-| Touch interrupt | GPIO | GPIO | `touch.interrupt_gpio_line` | Optional PC11 / GPIO 75 / physical pin 12; touch falls back to polling |
-
-## Architecture
-
-`travel-laser-controller` is an asyncio Python backend intended for an Orange Pi Zero 3 running Armbian or Orange Pi OS. The deployed hostname is `Travel-Laser`.
-
-Main services:
-
-- GPIO safety service owns K1, the hard E-stop relay output, plus the physical power and E-stop sense inputs.
-- USB manager discovers laser and camera devices by VID, PID, serial, or descriptive fallback.
-- The deployed GRBL proxy discovers the matching stable `/dev/serial/by-id/...` laser path and opens it at `115200` baud; it never assumes `/dev/ttyUSB0`.
-- GRBL proxy exposes the laser to LightBurn as a TCP GRBL device on port `23`.
-- Local UI renders machine controls and hardware status to the Hosyond ST7796U/FT6336U touchscreen.
-- Web portal serves only the WebRTC camera, HOME, E-STOP, and LASER OK/FAULT status. Hardware detail and diagnostics remain on the local touchscreen.
-- `travel-laser-controller` owns the canonical state, safety, GRBL, networking, mode, USB, logging, and system-action services.
-- `travel-laser-ui` owns only the SPI display, FT6336 touch input, rendering, and a client for the controller's loopback API.
-- The local touchscreen API is bound strictly to `127.0.0.1:8081`; it is never exposed on LAN, Wi-Fi, Ethernet, Tailscale, or `0.0.0.0`.
-- Mode manager enforces exclusive Network vs VirtualHere ownership.
-
-Network mode owns the laser USB serial device. VirtualHere mode is a backup/service path and must not run concurrently with the GRBL proxy. VirtualHere is expected to be installed on the Orange Pi, but configured separately unless `VIRTUALHERE_BACKEND_CONTROLS_SERVICE=true` is deliberately enabled after testing.
-
-Retired vendor accessory/controller/display research is not part of the active architecture.
-
-## Networking And LightBurn
-
-The intended deployment uses normal uplink networking only. There is no private accessory AP in the active architecture.
-
-- Ethernet uses `eth0` with route metric `100`.
-- Uplink Wi-Fi uses `wlan0` with route metric `300`.
-- `eth0` is preferred over `wlan0` when both are connected.
-- `wlan0` is configurable from the local touchscreen Network screen and the web/network backend.
-- Remote browser access is expected through Tailscale.
-- The web portal binds only to the configured Tailscale IPv4 address on port `8080`.
-- `scripts/configure-network.sh` applies route metrics for `eth0` and `wlan0` with `nmcli`.
-
-Power-service defaults:
-
-- Bluetooth is disabled and masked by default.
-- Common non-networking background services are disabled when present: Avahi/mDNS discovery, CUPS printing, BRLTTY, and ModemManager.
-- NetworkManager, Ethernet, Wi-Fi, SSH, Tailscale, MediaMTX, and Travel-Laser services are left enabled.
-- `scripts/disable-power-services.sh` performs this cleanup during deploy and ignores services that are not installed on the OS image.
-
-LightBurn setup:
-
-- Mode: Network mode.
-- Protocol/device type: GRBL over TCP/network.
-- Host/address: use the IP address shown on the local touchscreen Network page.
-- Prefer Ethernet `eth0` when connected; use Wi-Fi `wlan0` only when Ethernet is unavailable.
-- Port: `23`.
-
-The GRBL proxy listens on `0.0.0.0:23` in deployment. Only one LightBurn TCP client is accepted at a time. The proxy is intended to be transparent GRBL transport and does not expose LightBurn file names, job names, layer names, artwork previews, or estimated time remaining.
-
-## GRBL Proxy
-
-Realtime injections:
-
-- Pause: `!`
-- Resume: `~`
-- Stop: `0x18`
-- Status poll: `?`
-
-Idle-only commands such as `$H` and `$J=` are rejected while a job stream is active. If the active LightBurn TCP stream unexpectedly disconnects, K1 drops immediately.
-
-## Local UI
-
-The local touchscreen UI is rendered directly on the Orange Pi:
+After the remaining deployment placeholders are completed and the K1 safety wiring is verified, run:
 
 ```bash
-travel-laser-ui --config /etc/travel-laser/controller.yaml --display st7796 --touch ft6336
+sudo /opt/travel-laser-controller/scripts/deploy.sh
 ```
 
-The UI polls the controller at `http://127.0.0.1:8081/state` approximately every 200 ms. Commands use the same loopback API and never access GPIO, GRBL serial, USB, NetworkManager, VirtualHere, or systemd directly.
-
-Local API routes include `/state`, `/health`, `/diagnostics`, `/commands/home`, `/commands/stop`, `/commands/estop`, `/network/scan`, `/network/connect`, `/network/forget`, `/mode`, `/logs/export`, and the `/system/*` maintenance routes. All responses use structured JSON with `ok`, `status`, `message`, `code`, and `data` fields.
-
-Touchscreen confirmation, busy, success, error, and text-entry state are represented by reusable dialog models. Modal dialogs suppress page scrolling and suspend the idle-home timer. Manual log export searches only mounted USB filesystem partitions and writes a unique `Travel_Laser_Logs_<timestamp>` directory; it never selects the internal system disk.
-
-The Network screen consumes backend scan results, displays SSID/security information, opens the transient masked keyboard for secured networks, and sends Wi-Fi credentials only in the connect command payload. Mode, forget-network, export, restart, reboot, and shutdown actions require confirmation; E-stop, Stop, Home, and Scan do not.
-
-All local screens target `480x320` landscape:
-
-- Home: machine state plus two large same-priority controls, `HOME` and `STOP`.
-- Status: GRBL state, LightBurn TCP connection/stream state, Power, E-stop Sense, Safety Relay, Laser USB connection, and Tailscale state.
-- Network: `eth0` connection state with received IP below it, `wlan0` SSID/state with received IP below it, Wi-Fi scan, SSID selection, password prompt, connect, forget, and refresh.
-- Mode: Network vs VirtualHere ownership. Selecting the inactive mode opens a confirmation popup before changing modes.
-- System: display/touch test, diagnostics, service controls, reboot/shutdown, GPIO Status, USB Identity, SPI/I2C status, View Logs, and Export Logs to USB status.
-
-Bottom navigation order is fixed as `Home`, `Status`, `Net`, `Mode`, `System`. `STOP` is not a navigation tab; it is a large Home-screen action.
-
-Any local page content beyond the fixed header/nav viewport must scroll vertically. Dragging within the content area scrolls the current page while nav taps remain fixed. If a drag starts on a button or control, the scroll gesture arms after a 300 ms hold so quick taps still activate controls.
-
-After 20 seconds with no touch input, the deployed local touchscreen returns to the Home screen. Any text entry on the local touchscreen must open an on-screen keyboard, including Wi-Fi passwords and future editable settings.
-
-The local UI does not display the camera stream, does not include a file browser, and does not launch local jobs. Jobs always originate from the external computer through LightBurn/GRBL.
-
-## Hardware Bring-Up Checklist
-
-The following remain physical validation items and are intentionally not guessed by software:
-
-- Orange Pi Server boot, 5 V rail, temperature, gpiochip enumeration, and service permissions.
-- SPI1 device node, ST7796U initialization, landscape rotation, backlight, and reset behavior.
-- I2C3/FT6336U response, touch orientation, edge accuracy, and touch reset.
-- K1 power-loop behavior, S6 USB enumeration delay, VID/PID/serial identity, disconnect on K1 drop, and recovery after K1 restore.
-- Camera path, resolution/FPS stability, bandwidth, and power behavior.
-- Ethernet, wlan0 scan/connect, Tailscale startup/IP, Tailscale-only port `8080`, and loopback-only port `8081`.
-- Physical E-stop drop, expected USB loss after K1 drop, and unexpected USB loss while K1 is energized.
-
-Diagnostics report `UNVALIDATED`, `UNKNOWN`, or `NOT DETECTED` until the backend can verify a device. No final USB identifiers, SPI node, I2C permissions, or unverified GPIO mappings are promoted by the UI.
-
-## Web Portal And Camera
-
-- Web portal: `GET /api/status` for camera/status refresh, `POST /api/home`, and `POST /api/estop`.
-- Deployment uses `web.bind_to_tailscale: true`; startup intentionally fails until `network.tailscale.ip_address` is known.
-- If no `camera.stream_url` is configured, the portal defaults to `http://<current-host>:8889/cam`.
-- MediaMTX serves WebRTC on port `8889`.
-- FFmpeg publishes the selected V4L2 camera mode to MediaMTX over RTSP on `127.0.0.1:8554/cam`.
-- `scripts/select-camera-mode.sh` selects the largest advertised V4L2 resolution.
-- Camera service starts at 30 FPS by default; confirm the highest stable resolution/FPS after the physical camera is present.
-- Camera failure never stops the laser and must not affect K1.
-
-## Hardware Details
-
-Known relay meanings:
-
-- K1: E-stop relay that kills the laser controller completely.
-
-Display/touch module facts:
-
-- Target module: Hosyond 3.5-inch IPS capacitive touch LCD, ASIN `B0CMD7Y55M`.
-- LCD controller: ST7796U.
-- Touch controller: FT6336U.
-- Native portrait resolution: `320x480`.
-- Application orientation: `480x320` landscape.
-- Pixel format: RGB565.
-- Module power: 5 V.
-- Orange Pi GPIO logic: 3.3 V.
-- Never apply 5 V to an Orange Pi GPIO signal pin.
-
-Driver approach:
-
-- `backend.display.st7796_display.ST7796Display` drives ST7796U over Linux `spidev`.
-- `backend.input.ft6336_touch.FT6336Touch` reads FT6336U over Linux I2C with `smbus2`.
-- `backend.display.desktop_display.DesktopDisplay` writes `.state/display.ppm` for development.
-- If the final Orange Pi OS image exposes a reliable kernel DRM/fbdev/input stack, that path can be preferred later.
-
-Final display/touch wiring:
-
-| LCD module signal | Orange Pi Zero 3 signal | SoC pin | Header pin | Linux GPIO | Config |
-| --- | --- | --- | ---: | ---: | --- |
-| VCC | 5V | n/a | 2 or 4 | n/a | n/a |
-| GND | Ground | n/a | 6 | n/a | n/a |
-| LCD_CS | SPI1 CS | PH9 | 24 | n/a | `display.spi_device` |
-| MOSI / SDI | SPI1 MOSI | PH7 | 19 | n/a | `display.spi_device` |
-| MISO / SDO | SPI1 MISO | PH8 | 21 | n/a | `display.spi_device` |
-| SCK / CLK | SPI1 CLK | PH6 | 23 | n/a | `display.spi_device` |
-| LCD_DC / RS | GPIO | PC6 | 11 | 70 | `display.dc_gpio_line` |
-| LCD_RST | GPIO | PC9 | 7 | 73 | `display.reset_gpio_line` |
-| CTP_SDA | I2C3 SDA | PH5 | 3 | n/a | `touch.i2c_bus` |
-| CTP_SCL | I2C3 SCL | PH4 | 5 | n/a | `touch.i2c_bus` |
-| CTP_RST | GPIO | PC5 | 13 | 69 | `touch.reset_gpio_line` |
-| CTP_INT | GPIO | PC11 | 12 | 75 | `touch.interrupt_gpio_line` |
-
-CTP_INT on PC11 is optional. The current FT6336U backend polls over I2C, so touch remains usable and does not fail if CTP_INT is left disconnected. Do not wire CTP_INT to PC8; PC8 is reserved for K1.
-
-Bus rules:
-
-- Use SPI1 only for the ST7796U display.
-- Use I2C3 only for the FT6336U touch controller.
-- Do not bit-bang SPI or I2C.
-- Use Linux SPI/I2C subsystems and libgpiod for LCD_RST, LCD_DC, CTP_RST, and optional CTP_INT.
-- Keep gpiochip, SPI device path, and I2C bus number configurable until verified on the running OS.
-- Do not substitute SPI0, SPI2, I2C0, I2C1, or another bus automatically.
-- Do not use Raspberry Pi BCM GPIO numbering.
-
-## Orange Pi Install Notes
-
-```bash
-sudo apt-get update
-sudo apt-get install -y curl ffmpeg git gpiod i2c-tools jq libgpiod-dev network-manager python3-dev python3-libgpiod python3-pip python3-smbus python3-venv rsync v4l-utils
-sudo scripts/deploy.sh
-```
-
-On the first run, `scripts/deploy.sh` creates `/etc/travel-laser/deployment.env` if it does not exist, auto-fills safe single-device values, and stops only if required hardware choices remain ambiguous. See `PLACEHOLDERS.md`. Rerun the same deploy script after resolving any missing values; it applies them to `/etc/travel-laser/controller.yaml`, configures network metrics, and starts services when `START_SERVICES=true`.
-
-Enable SPI/I2C using the board image tooling, then reboot:
-
-```bash
-sudo armbian-config
-# or, on Orange Pi OS images:
-sudo orangepi-config
-```
-
-After reboot, verify:
-
-```bash
-ls /dev/spidev*
-ls /dev/i2c-*
-gpioinfo
-i2cdetect -l
-```
-
-## Diagnostics
-
-```bash
-.venv/bin/python scripts/diagnostics/hardware_info.py --config config/controller.example.yaml
-.venv/bin/python scripts/diagnostics/display_test.py --config config/controller.example.yaml --display desktop
-.venv/bin/python scripts/diagnostics/display_test.py --config /etc/travel-laser/controller.yaml --display st7796
-.venv/bin/python scripts/diagnostics/touch_test.py --config /etc/travel-laser/controller.yaml
-```
-
-## Log Export
-
-On deployed hardware, inserting a filesystem USB flash drive larger than 200 MB starts `travel-laser-log-export@.service` through udev. Logs are copied to:
-
-```text
-<USB drive>/Travel-Laser-Logs/<hostname>-<UTC timestamp>/
-```
-
-The export includes `/var/log/travel-laser` plus recent journals for the controller, local UI, camera, and MediaMTX services. Drives under 200 MB are ignored.
-
-## Remaining Hardware-Dependent Items
-
-- Let `scripts/deploy.sh` auto-fill Tailscale IP, camera path, and laser USB identity where the Orange Pi can identify a single safe candidate.
-- Resolve any ambiguous deployment values listed in `PLACEHOLDERS.md`.
-- Confirm the highest stable camera mode reported by `v4l2-ctl --list-formats-ext` if `highest_available` is unstable.
-- Confirm the OS device names for SPI1 and I2C3 after enabling them.
-- Confirm whether ST7796U userspace SPI is fast enough or whether a kernel DRM/fbdev route is better on the chosen OS image.
-- Confirm the exact VirtualHere service name and whether backend-controlled mode switching should start/stop that service or leave it manual.
-
-## Recovery Rules
-
-No automatic job resume is allowed after E-stop, Pi reboot, power failure, controller reset, or unexpected laser USB loss. After recovery, LightBurn reconnects and homes the machine.
-
-K1 is the hard E-stop path and kills the laser controller completely. If K1 is intentionally dropped, laser USB disappearance is expected and should not create a second critical USB fault.
-
-Software E-stop clear requires the E-stop power sense input to cycle active and back to OK: PC15 low, then PC15 high. Returning PC15 high without a prior low transition does not clear a software E-stop.
+The deploy script can auto-fill Tailscale IP, a single camera device, and a single laser serial identity when unambiguous.
 
 ## Testing
-
-Run:
 
 ```bash
 .venv/bin/python -m pytest
 ```
 
-The suite uses mocks for GPIO, serial, USB, VirtualHere, and network behavior. Safety behavior should always have tests before changes are committed.
-
-## References
-
-- libgpiod documentation: https://libgpiod.readthedocs.io/en/master/
-- Debian libgpiod packages: https://packages.debian.org/bookworm/source/libgpiod
-- NetworkManager nmcli settings reference: https://networkmanager.pages.freedesktop.org/NetworkManager/NetworkManager/nm-settings-nmcli.html
-- MediaMTX WebRTC features: https://mediamtx.org/docs/features/webrtc-specific-features
-- Linux kernel EDT/FocalTech touch driver docs: https://docs.kernel.org/input/devices/edt-ft5x06.html
-- Linux kernel EDT/FocalTech touch driver source: https://github.com/torvalds/linux/blob/master/drivers/input/touchscreen/edt-ft5x06.c
-- ST7796 LCD controller datasheet reference: https://orientdisplay.com/st7796-lcd-controller-datasheet/
-- 3.5-inch ST7796 SPI module parameter reference: https://www.lcdwiki.com/3.5inch_IPS_SPI_Module_ST7796
+Keep hardware assumptions in config and documentation synchronized with physically verified behavior.

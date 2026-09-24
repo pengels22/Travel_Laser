@@ -11,36 +11,52 @@ def test_example_config_captures_deployment_defaults():
     assert config.laser.baud == 115200
     assert config.camera.stream_type == "webrtc"
     assert config.camera.resolution == "highest_available"
-    assert config.gpio.power_input.chip == "gpiochip0"
+
+    assert config.gpio.power_input.chip == "/dev/gpiochip1"
     assert config.gpio.power_input.line == 78
     assert config.gpio.power_input.board_pin == "PC14"
     assert config.gpio.power_input.active_high is True
+
+    assert config.gpio.estop_input.chip == "/dev/gpiochip1"
     assert config.gpio.estop_input.line == 79
     assert config.gpio.estop_input.board_pin == "PC15"
     assert config.gpio.estop_input.active_high is False
+
+    assert config.gpio.k1_output.chip == "/dev/gpiochip1"
     assert config.gpio.k1_output.line == 72
     assert config.gpio.k1_output.board_pin == "PC8"
+
     assert config.display.controller == "ST7796U"
     assert config.display.width == 480
     assert config.display.height == 320
-    assert config.display.spi_device == "/dev/spidev1.0"
+    assert config.display.rotation == 90
+    assert config.display.spi_device == "/dev/spidev1.1"
+    assert config.display.spi_speed_hz == 10_000_000
+    assert config.display.dc_gpio_chip == "/dev/gpiochip1"
     assert config.display.dc_gpio_line == 70
-    assert config.display.reset_gpio_line == 73
+    assert config.display.reset_gpio_chip is None
+    assert config.display.reset_gpio_line is None
+
     assert config.touch.controller == "FT6336U"
     assert config.touch.i2c_address == 0x38
-    assert config.touch.i2c_bus == 3
+    assert config.touch.i2c_bus == 2
+    assert config.touch.reset_gpio_chip == "/dev/gpiochip1"
     assert config.touch.reset_gpio_line == 69
-    assert config.touch.interrupt_gpio_line == 75
-    assert config.network.ethernet_interface == "eth0"
+    assert config.touch.interrupt_gpio_chip is None
+    assert config.touch.interrupt_gpio_line is None
+
+    assert config.network.ethernet_interface == "end0"
     assert config.network.ethernet_metric == 100
     assert config.network.uplink_wifi_interface == "wlan0"
     assert config.network.uplink_wifi_metric == 300
     assert config.network.tailscale_enabled is True
     assert config.network.tailscale_interface == "tailscale0"
     assert config.network.tailscale_ip is None
+
     assert config.web.host is None
     assert config.web.bind_to_tailscale is True
     assert config.web.port == 8080
+
     assert config.fire.enabled is False
     assert config.fire.sensor_enabled is False
     assert config.fire.drop_k1 is True
@@ -65,7 +81,12 @@ def test_web_host_resolves_to_tailscale_ip_when_required():
 
 
 def test_web_host_requires_tailscale_ip_when_tailscale_only():
-    config = config_from_dict({"web": {"bind_to_tailscale": True}, "network": {"tailscale": {"ip_address": None}}})
+    config = config_from_dict(
+        {
+            "web": {"bind_to_tailscale": True},
+            "network": {"tailscale": {"ip_address": None}},
+        }
+    )
 
     try:
         _resolve_web_host(config)
@@ -76,12 +97,17 @@ def test_web_host_requires_tailscale_ip_when_tailscale_only():
 
 
 def test_mock_web_host_allows_missing_tailscale_ip_on_loopback():
-    config = config_from_dict({"web": {"bind_to_tailscale": True}, "network": {"tailscale": {"ip_address": None}}})
+    config = config_from_dict(
+        {
+            "web": {"bind_to_tailscale": True},
+            "network": {"tailscale": {"ip_address": None}},
+        }
+    )
 
     assert _resolve_web_host(config, allow_unset_tailscale=True) == "127.0.0.1"
 
 
-def test_example_config_has_no_gpio_line_overlaps():
+def test_example_config_has_no_configured_gpio_line_overlaps():
     config = load_config(Path("config/controller.example.yaml"))
     assigned = {
         "power_input": (config.gpio.power_input.chip, config.gpio.power_input.line),
@@ -93,6 +119,7 @@ def test_example_config_has_no_gpio_line_overlaps():
         "touch_reset": (config.touch.reset_gpio_chip, config.touch.reset_gpio_line),
         "touch_interrupt": (config.touch.interrupt_gpio_chip, config.touch.interrupt_gpio_line),
     }
+
     seen: dict[tuple[str, int], str] = {}
     for name, key in assigned.items():
         chip, line = key

@@ -60,11 +60,11 @@ udev_property() {
 auto_fill_tailscale_ip() {
   env_has_value TRAVEL_LASER_TAILSCALE_IP && return
   command -v tailscale >/dev/null 2>&1 || return
-  local TAILSCALE_IP
-  TAILSCALE_IP="$(tailscale ip -4 2>/dev/null | head -n 1 || true)"
-  if [[ -n "${TAILSCALE_IP}" ]]; then
-    set_env_value TRAVEL_LASER_TAILSCALE_IP "${TAILSCALE_IP}"
-    echo "Filled TRAVEL_LASER_TAILSCALE_IP=${TAILSCALE_IP}"
+  local tailscale_ip
+  tailscale_ip="$(tailscale ip -4 2>/dev/null | head -n 1 || true)"
+  if [[ -n "${tailscale_ip}" ]]; then
+    set_env_value TRAVEL_LASER_TAILSCALE_IP "${tailscale_ip}"
+    echo "Filled TRAVEL_LASER_TAILSCALE_IP=${tailscale_ip}"
   fi
 }
 
@@ -85,9 +85,11 @@ auto_fill_laser_usb_identity() {
   if env_has_value LASER_USB_VID || env_has_value LASER_USB_PID || env_has_value LASER_USB_SERIAL || env_has_value LASER_USB_DESCRIPTION; then
     return
   fi
+
   local dev vid pid serial
   local -a serials
   mapfile -t serials < <(find /dev/serial/by-id -maxdepth 1 -type l 2>/dev/null | sort)
+
   if [[ "${#serials[@]}" -eq 1 ]]; then
     dev="${serials[0]}"
     vid="$(udev_property "${dev}" ID_VENDOR_ID)"
@@ -107,20 +109,23 @@ auto_fill_tailscale_ip
 auto_fill_camera_device
 auto_fill_laser_usb_identity
 
-"${PYTHON_BIN}" "${SOURCE_DIR}/scripts/apply-placeholders.py" --env "${DEPLOY_ENV}" --config "${CONTROLLER_CONFIG}"
+"${PYTHON_BIN}" "${SOURCE_DIR}/scripts/apply-placeholders.py" \
+  --env "${DEPLOY_ENV}" \
+  --config "${CONTROLLER_CONFIG}"
 
 set -a
 # shellcheck disable=SC1090
 source "${DEPLOY_ENV}"
 set +a
 
-ETH_IFACE="${ETH_IFACE:-eth0}" \
+ETH_IFACE="${ETH_IFACE:-end0}" \
 ETH_METRIC="${ETH_METRIC:-100}" \
 WIFI_UPLINK_IFACE="${WIFI_UPLINK_IFACE:-wlan0}" \
 WIFI_UPLINK_METRIC="${WIFI_UPLINK_METRIC:-300}" \
   "${SOURCE_DIR}/scripts/configure-network.sh"
 
 systemctl daemon-reload
+
 if [[ "${START_SERVICES}" == "true" ]]; then
   systemctl enable --now mediamtx.service
   systemctl enable --now travel-laser-camera.service

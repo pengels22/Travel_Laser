@@ -20,8 +20,8 @@ def test_apply_placeholders_updates_controller_config(tmp_path: Path) -> None:
                 "LASER_USB_DESCRIPTION=CH340",
                 "CAMERA_DEVICE=/dev/v4l/by-id/test-camera",
                 "CAMERA_STREAM_URL=http://travel-laser:8889/cam",
-                "DISPLAY_SPI_DEVICE=/dev/spidev1.0",
-                "TOUCH_I2C_BUS=3",
+                "DISPLAY_SPI_DEVICE=/dev/spidev1.1",
+                "TOUCH_I2C_BUS=2",
                 "VIRTUALHERE_BACKEND_CONTROLS_SERVICE=false",
             )
         )
@@ -49,8 +49,8 @@ def test_apply_placeholders_updates_controller_config(tmp_path: Path) -> None:
     assert config["network"]["tailscale"]["ip_address"] == "100.64.12.34"
     assert config["laser"]["usb"]["description_contains"] == "CH340"
     assert config["camera"]["stream_url"] == "http://travel-laser:8889/cam"
-    assert config["display"]["spi_device"] == "/dev/spidev1.0"
-    assert config["touch"]["i2c_bus"] == 3
+    assert config["display"]["spi_device"] == "/dev/spidev1.1"
+    assert config["touch"]["i2c_bus"] == 2
     assert config["virtualhere"]["backend_controls_service"] is False
 
 

@@ -5,7 +5,6 @@ FIRE_SENSOR: false
 
 laser:
   tcp_port: 23
-  # Confirmed GRBL serial baud rate.
   baud: 115200
   mode: network
   usb:
@@ -32,62 +31,65 @@ display:
   width: 480
   height: 320
   rotation: 90
-  # ST7796U uses SPI1 only: CS PH9/pin 24, MOSI PH7/pin 19, MISO PH8/pin 21, SCK PH6/pin 23.
-  # Verify the OS exposes SPI1 as /dev/spidev1.0 after enabling SPI1.
-  spi_device: /dev/spidev1.0
-  spi_speed_hz: 24000000
-  # LCD_DC/RS = PC6, Linux GPIO 70, physical pin 11.
-  dc_gpio_chip: gpiochip0
+
+  # Physically validated on Armbian 26.11 / kernel 6.18.52-current-sunxi64.
+  # SPI1: SCK PH6/pin23, MOSI PH7/pin19, MISO PH8/pin21, CS1 PH9/pin24.
+  spi_device: /dev/spidev1.1
+  spi_speed_hz: 10000000
+
+  # LCD_DC / RS = PC6 / GPIO line 70 / physical pin 11.
+  dc_gpio_chip: /dev/gpiochip1
   dc_gpio_line: 70
-  # LCD_RST = PC9, Linux GPIO 73, physical pin 7.
-  reset_gpio_chip: gpiochip0
-  reset_gpio_line: 73
+
+  # LCD_RST is physically connected to PC9 / GPIO73 / pin 7, but PC9 is
+  # reserved by the Orange Pi Zero 3 PMIC interrupt and cannot be claimed
+  # safely from userspace. The validated panel works without GPIO reset.
+  reset_gpio_chip: null
+  reset_gpio_line: null
+
+  # Backlight is tied on in the current wiring.
   backlight_gpio_chip: null
   backlight_gpio_line: null
 
 touch:
   controller: FT6336U
-  # FT6336U uses I2C3 only: SDA PH5/pin 3, SCL PH4/pin 5.
-  # Verify the OS exposes I2C3 as /dev/i2c-3.
-  i2c_bus: 3
+
+  # I2C3 on PH4/PH5 is exposed as /dev/i2c-2 on the validated image.
+  i2c_bus: 2
   i2c_address: 0x38
   rotation: 90
-  # CTP_RST = PC5, Linux GPIO 69, physical pin 13.
-  reset_gpio_chip: gpiochip0
+
+  # CTP_RST = PC5 / GPIO line 69 / physical pin 13.
+  reset_gpio_chip: /dev/gpiochip1
   reset_gpio_line: 69
-  # Optional CTP_INT = PC11, Linux GPIO 75, physical pin 12.
-  # Touch polling still works if this line is not connected.
-  # Do not use PC8/GPIO 72 for CTP_INT; PC8 is reserved for K1.
-  interrupt_gpio_chip: gpiochip0
-  interrupt_gpio_line: 75
+
+  # The FT6336 backend polls I2C and does not require CTP_INT.
+  # CTP_INT is not in use on this build, so leave it disabled.
+  interrupt_gpio_chip: null
+  interrupt_gpio_line: null
 
 gpio:
   power_input:
-    # PC14 high means laser input power is present.
-    # Sense signal is deterministic; do not configure internal pull-up/down bias unless hardware changes.
-    chip: gpiochip0
+    chip: /dev/gpiochip1
     line: 78
     board_pin: PC14
     bias: none
     active_high: true
+
   estop_input:
-    # PC15 high means E-stop power sense is OK. Low means E-stop active.
-    # active_high is false because the software state means "E-stop active".
-    # Sense signal is deterministic; do not configure internal pull-up/down bias unless hardware changes.
-    chip: gpiochip0
+    chip: /dev/gpiochip1
     line: 79
     board_pin: PC15
     bias: none
     active_high: false
+
   k1_output:
-    # Single hard E-stop relay output. Relay output is confirmed active high.
-    chip: gpiochip0
+    chip: /dev/gpiochip1
     line: 72
     board_pin: PC8
     active_high: true
 
 fire:
-  # FIRE_SENSOR false blocks fire logic from affecting outputs until real fire hardware exists.
   sensor_enabled: false
   enabled: false
   active: false
@@ -98,7 +100,6 @@ fire:
 
 virtualhere:
   service_name: virtualhere
-  # VirtualHere is installed on the Orange Pi but configured separately by default.
   backend_controls_service: false
 
 network:
@@ -107,18 +108,15 @@ network:
     interface: wlan0
     metric: 300
   ethernet:
-    interface: eth0
+    interface: end0
     metric: 100
   tailscale:
     enabled: true
     interface: tailscale0
-    # scripts/deploy.sh fills this from `tailscale ip -4` after the device joins the tailnet.
     ip_address: null
   ethernet_preferred: true
 
 web:
-  # Deployment should listen only on the Tailscale IP, not every interface.
-  # With bind_to_tailscale enabled, startup intentionally fails until network.tailscale.ip_address is set.
   host: null
   bind_to_tailscale: true
   port: 8080
