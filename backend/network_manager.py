@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from dataclasses import dataclass
 
 
@@ -19,6 +20,13 @@ class NetworkInterfaceStatus:
     connected: bool = False
     ip_address: str | None = None
     ssid: str | None = None
+
+
+@dataclass
+class TailscaleStatus:
+    connected: bool = False
+    ip_address: str | None = None
+    status: str = "unavailable"
 
 
 class NetworkManager:
@@ -72,9 +80,38 @@ class NetworkManager:
         output = await self._run_nmcli("-t", "-f", "GENERAL.STATE,GENERAL.CONNECTION,IP4.ADDRESS", "device", "show", interface)
         return _parse_interface_status(interface, output)
 
+    async def tailscale_status(self, interface: str = "tailscale0") -> TailscaleStatus:
+        if self.dry_run:
+            await asyncio.sleep(0)
+            return TailscaleStatus(status="dry-run")
+        try:
+            output = await self._run_command("tailscale", "status", "--json")
+            parsed = json.loads(output)
+            ips = parsed.get("Self", {}).get("TailscaleIPs", []) or []
+            ipv4 = next((ip for ip in ips if "." in ip), None)
+            backend_state = str(parsed.get("BackendState") or "").lower()
+            connected = bool(ipv4 and backend_state == "running")
+            return TailscaleStatus(
+                connected=connected,
+                ip_address=ipv4,
+                status="connected" if connected else backend_state or "not connected",
+            )
+        except Exception:
+            try:
+                status = await self.interface_status(interface)
+                return TailscaleStatus(
+                    connected=status.connected and bool(status.ip_address),
+                    ip_address=status.ip_address,
+                    status="connected" if status.connected and status.ip_address else "interface unavailable",
+                )
+            except Exception as exc:
+                return TailscaleStatus(status=str(exc) or "unavailable")
+
     async def _run_nmcli(self, *args: str) -> str:
+        return await self._run_command("nmcli", *args)
+
+    async def _run_command(self, *args: str) -> str:
         process = await asyncio.create_subprocess_exec(
-            "nmcli",
             *args,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,

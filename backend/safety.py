@@ -23,7 +23,6 @@ class SafetyController:
         self.gpio = gpio
         self.event_sink = event_sink
         self.events: list[ControllerEvent] = []
-        self._software_clear_armed = False
 
     async def initialize_safe(self) -> None:
         await self.gpio.initialize_safe()
@@ -36,17 +35,21 @@ class SafetyController:
     async def refresh_physical_inputs(self) -> None:
         power = await self.gpio.read_power_sense()
         estop = await self.gpio.read_estop_sense()
+        previous = await self.state.snapshot()
 
         def mutate(snapshot):
             snapshot.physical.power_sense = power
             snapshot.physical.estop_sense = estop
 
         await self.state.update(mutate)
-        if estop:
-            self._software_clear_armed = True
-        elif self._software_clear_armed:
-            await self.clear_software_estop()
-            self._software_clear_armed = False
+        if power != previous.physical.power_sense:
+            self.record(EventCode.POWER_SWITCH_ON if power else EventCode.POWER_SWITCH_OFF, Severity.INFO, "gpio")
+        if estop != previous.physical.estop_sense:
+            self.record(
+                EventCode.PHYSICAL_ESTOP_ON if estop else EventCode.PHYSICAL_ESTOP_OFF,
+                Severity.CRITICAL if estop else Severity.INFO,
+                "gpio",
+            )
         await self.evaluate_outputs()
 
     async def evaluate_outputs(self) -> None:
@@ -69,9 +72,6 @@ class SafetyController:
             EstopSource.USB: EventCode.LASER_USB_DISCONNECTED,
             EstopSource.FIRE: EventCode.SOFTWARE_ESTOP,
         }[source]
-        if source != EstopSource.PHYSICAL:
-            self._software_clear_armed = False
-
         def mutate(snapshot):
             if source == EstopSource.PHYSICAL:
                 snapshot.physical.estop_sense = True
@@ -88,16 +88,32 @@ class SafetyController:
         await self.set_k1(False)
         self.record(event_code, Severity.CRITICAL, source.value, {"reason": reason})
 
-    async def clear_software_estop(self) -> None:
+    async def reset_fault(self) -> tuple[bool, str | None]:
+        snapshot = await self.state.snapshot()
+        if snapshot.physical.estop_sense:
+            return False, "physical E-stop is active"
+        if snapshot.lightburn.stream_active or snapshot.machine.state in {
+            MachineState.RUN,
+            MachineState.HOLD,
+            MachineState.JOG,
+            MachineState.HOME,
+        }:
+            return False, "machine is active"
+        if snapshot.safety.fire_enabled and snapshot.safety.fire_active:
+            return False, "fire fault is active"
+
         def mutate(snapshot):
             snapshot.safety.remote_estop = False
             snapshot.safety.software_estop = False
-            snapshot.safety.fire_active = False
-            if not snapshot.physical.estop_sense:
-                snapshot.machine.state = MachineState.RECOVERING
+            if not snapshot.safety.fire_enabled:
+                snapshot.safety.fire_active = False
+            snapshot.machine.homed = False
+            snapshot.machine.state = MachineState.RECOVERING
 
         await self.state.update(mutate)
         await self.evaluate_outputs()
+        self.record(EventCode.CONTROLLER_RECOVERED, Severity.INFO, "safety")
+        return True, None
 
     async def set_k1(self, energized: bool) -> None:
         snapshot = await self.state.snapshot()

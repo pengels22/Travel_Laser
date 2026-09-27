@@ -35,7 +35,9 @@ class WebPortal:
         app = web.Application()
         app.router.add_get("/api/status", self._status)
         app.router.add_post("/api/home", self._home)
+        app.router.add_post("/api/stop", self._stop)
         app.router.add_post("/api/estop", self._estop)
+        app.router.add_post("/api/reset-fault", self._reset_fault)
         app.router.add_static("/", self.static_dir, show_index=False, append_version=True)
         self.runner = web.AppRunner(app)
         await self.runner.setup()
@@ -63,3 +65,15 @@ class WebPortal:
             return web.json_response(result.as_dict())
         await self.safety.request_estop(EstopSource.WEB, "web portal requested E-stop")
         return web.json_response({"ok": True})
+
+    async def _stop(self, _: web.Request) -> web.Response:
+        if not self.commands:
+            return web.json_response({"ok": False, "message": "command service unavailable"}, status=503)
+        result = await self.commands.stop()
+        return web.json_response(result.as_dict(), status=200 if result.ok else 409)
+
+    async def _reset_fault(self, _: web.Request) -> web.Response:
+        if not self.commands:
+            return web.json_response({"ok": False, "message": "command service unavailable"}, status=503)
+        result = await self.commands.reset_fault()
+        return web.json_response(result.as_dict(), status=200 if result.ok else 409)

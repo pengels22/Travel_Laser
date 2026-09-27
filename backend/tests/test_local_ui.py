@@ -50,7 +50,7 @@ def test_local_ui_detects_content_controls_with_scroll_offset() -> None:
 
     assert ui.hit_content_control("home", 90, 140) == "home"
     assert ui.hit_content_control("net", 150, 249, scroll_y=46) == "connect"
-    assert ui.hit_content_control("system", 50, 257, scroll_y=52) == "shutdown"
+    assert ui.hit_content_control("system", 50, 257, scroll_y=82) == "shutdown"
 
 
 def test_touch_down_on_nav_changes_screen() -> None:

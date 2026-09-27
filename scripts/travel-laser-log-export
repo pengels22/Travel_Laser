@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+DEVICE_NAME="${1:-}"
+
+if [[ ! "${DEVICE_NAME}" =~ ^[A-Za-z0-9_.-]+$ ]] || [[ "${DEVICE_NAME}" == *".."* ]]; then
+  echo "Invalid block device name" >&2
+  exit 2
+fi
+
+exec /opt/travel-laser-controller/scripts/export-logs-usb.sh "${DEVICE_NAME}"

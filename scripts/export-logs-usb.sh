@@ -6,6 +6,7 @@ MIN_BYTES="${TRAVEL_LASER_LOG_EXPORT_MIN_BYTES:-209715200}"
 LOG_SOURCE="${TRAVEL_LASER_LOG_SOURCE:-/var/log/travel-laser}"
 EXPORT_ROOT_NAME="${TRAVEL_LASER_LOG_EXPORT_DIR:-Travel-Laser-Logs}"
 MOUNT_ROOT="${TRAVEL_LASER_USB_MOUNT_ROOT:-/run/travel-laser-usb-export}"
+STATUS_FILE="${TRAVEL_LASER_LOG_EXPORT_STATUS:-/var/log/travel-laser/last-usb-export.json}"
 SERVICES=(
   travel-laser-controller.service
   travel-laser-ui.service
@@ -66,6 +67,10 @@ EOF
 
 sync "${MOUNT_POINT}" || true
 echo "Exported Travel-Laser logs to ${DEST}"
+mkdir -p "$(dirname "${STATUS_FILE}")"
+cat > "${STATUS_FILE}" <<EOF
+{"ok":true,"device":"${DEVICE}","destination":"${DEST}","timestamp":"${STAMP}"}
+EOF
 
 if (( MOUNTED_BY_SCRIPT == 1 )); then
   umount "${MOUNT_POINT}"

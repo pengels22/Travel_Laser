@@ -26,6 +26,7 @@ class LocalControllerAPI:
         app.router.add_post("/commands/home", self._home)
         app.router.add_post("/commands/stop", self._stop)
         app.router.add_post("/commands/estop", self._estop)
+        app.router.add_post("/commands/reset-fault", self._reset_fault)
         app.router.add_get("/network/scan", self._network_scan)
         app.router.add_post("/network/connect", self._wifi_connect)
         app.router.add_post("/network/forget", self._wifi_forget)
@@ -65,6 +66,9 @@ class LocalControllerAPI:
 
     async def _estop(self, _: web.Request) -> web.Response:
         return await self._result(self.commands.estop(EstopSource.LOCAL_UI, "local touchscreen requested E-stop"))
+
+    async def _reset_fault(self, _: web.Request) -> web.Response:
+        return await self._result(self.commands.reset_fault())
 
     async def _network_scan(self, _: web.Request) -> web.Response:
         return await self._result(self.commands.network_scan())

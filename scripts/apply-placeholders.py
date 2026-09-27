@@ -34,11 +34,6 @@ REQUIRED_ITEMS = (
         "auto-filled by deploy when `tailscale ip -4` works; otherwise run Tailscale setup first",
     ),
     (
-        "Camera device",
-        ("CAMERA_DEVICE",),
-        "auto-filled only when exactly one `/dev/v4l/by-id/*` camera is present; otherwise choose manually",
-    ),
-    (
         "Laser USB identity",
         ("LASER_USB_VID", "LASER_USB_PID", "LASER_USB_SERIAL", "LASER_USB_DESCRIPTION"),
         "auto-filled only when exactly one serial USB device is present; otherwise choose the laser controller manually",

@@ -90,6 +90,7 @@ class ModeState:
 @dataclass
 class DiagnosticsState:
     gpio_status: str = "UNVALIDATED"
+    gpio: dict[str, Any] = field(default_factory=dict)
     spi_device: str | None = None
     spi_status: str = "UNVALIDATED"
     i2c_bus: int | None = None
@@ -98,6 +99,10 @@ class DiagnosticsState:
     display_status: str = "UNVALIDATED"
     touch_status: str = "UNVALIDATED"
     usb_devices: list[dict[str, Any]] = field(default_factory=list)
+    laser_usb: dict[str, Any] | None = None
+    camera_usb: dict[str, Any] | None = None
+    services: list[dict[str, Any]] = field(default_factory=list)
+    network: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass

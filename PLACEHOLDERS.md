@@ -59,3 +59,11 @@ Before enabling services, confirm:
 - `/dev/gpiochip1` is present.
 
 Do not store passwords, keys, tokens, or other secrets in the deployment env file committed to Git.
+
+## Runtime Status
+
+Implemented in software: stable USB identity matching, laser USB disconnect/reconnect state handling, camera presence reporting, live diagnostics, touchscreen network controls, live Tailscale status, explicit fault reset, narrow privileged system actions, privileged USB log export, deploy preflight, and VirtualHere active-service verification.
+
+Still deployment-specific: laser VID/PID/serial or description, camera identity/path, optional camera stream URL, current Tailscale address when binding the external portal, and the VirtualHere service name if VirtualHere mode is enabled.
+
+Still pending physical deployment validation: real laser USB/GRBL reconnect on the Orange Pi, camera stream behavior, restart/reboot/shutdown helper invocation under systemd, USB log export from an actual flash drive, and VirtualHere ownership handoff. Fire hardware is not present; `fire.enabled=false` and `fire.sensor_enabled=false` mean fire trips are not accepted.

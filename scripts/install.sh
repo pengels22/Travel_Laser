@@ -37,6 +37,7 @@ apt-get install -y \
   python3-spidev \
   python3-venv \
   rsync \
+  sudo \
   v4l-utils
 
 for group in gpio i2c spi; do
@@ -66,6 +67,16 @@ python3 -m venv --system-site-packages .venv
 
 scripts/install-mediamtx.sh
 scripts/disable-power-services.sh
+
+install -o root -g root -m 0755 scripts/travel-laser-system-action /usr/local/sbin/travel-laser-system-action
+install -o root -g root -m 0755 scripts/travel-laser-log-export /usr/local/sbin/travel-laser-log-export
+cat > /etc/sudoers.d/travel-laser-system-action <<'EOF'
+travel-laser ALL=(root) NOPASSWD: /usr/local/sbin/travel-laser-system-action restart-services
+travel-laser ALL=(root) NOPASSWD: /usr/local/sbin/travel-laser-system-action reboot
+travel-laser ALL=(root) NOPASSWD: /usr/local/sbin/travel-laser-system-action shutdown
+travel-laser ALL=(root) NOPASSWD: /usr/local/sbin/travel-laser-log-export *
+EOF
+chmod 0440 /etc/sudoers.d/travel-laser-system-action
 
 cp systemd/travel-laser-controller.service /etc/systemd/system/travel-laser-controller.service
 cp systemd/travel-laser-camera.service /etc/systemd/system/travel-laser-camera.service

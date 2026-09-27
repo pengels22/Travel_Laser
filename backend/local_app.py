@@ -136,10 +136,53 @@ async def run(config_path: Path | None, display_mode: str, touch_mode: str) -> N
                             "home": "/commands/home", "stop": "/commands/stop", "estop": "/commands/estop",
                             "scan": "/network/scan", "export-logs": "/logs/export",
                             "network": "/mode", "virtualhere": "/mode",
-                            "forget": "/network/forget",
+                            "forget": "/network/forget", "reset-fault": "/commands/reset-fault",
                             "restart-services": "/system/restart", "reboot": "/system/reboot", "shutdown": "/system/shutdown",
                         }.get(command)
-                        confirm = command in {"virtualhere", "network", "forget", "restart-services", "reboot", "shutdown", "export-logs"}
+                        if command.startswith("ssid:"):
+                            try:
+                                network = runtime.networks[int(command.split(":", 1)[1])]
+                            except (ValueError, IndexError):
+                                network = None
+                            if network:
+                                runtime.selected_ssid = str(network.get("ssid", ""))
+                                runtime.message = f"Selected {runtime.selected_ssid}"
+                                await _draw_screen(display, ui, runtime)
+                            continue
+                        if command == "refresh":
+                            backend = await api.state()
+                            runtime.backend_state = UIState.from_payload(backend.raw, online=backend.online)
+                            result = await api.command("/network/scan")
+                            if result.get("ok"):
+                                runtime.networks = result.get("data", {}).get("networks", [])
+                            runtime.message = result.get("message", "Network state refreshed")
+                            await _draw_screen(display, ui, runtime)
+                            continue
+                        if command == "connect":
+                            network = _selected_network(runtime)
+                            if not network:
+                                runtime.dialog = DialogState(DialogKind.ERROR, "No network", "Select an SSID first")
+                                await _draw_screen(display, ui, runtime)
+                                continue
+                            security = network.get("security") or "open"
+                            if security == "open":
+                                runtime.dialog = DialogState(
+                                    DialogKind.CONFIRMATION, "Connect", f"Connect to {runtime.selected_ssid}?",
+                                    command="/network/connect", payload={"ssid": runtime.selected_ssid, "password": ""},
+                                )
+                            else:
+                                runtime.entry = TextEntryState(prompt=f"Password for {runtime.selected_ssid}")
+                                runtime.dialog = DialogState(
+                                    DialogKind.KEYBOARD, "Wi-Fi password", runtime.entry.prompt,
+                                    confirm_label="Connect", command="/network/connect", payload={"ssid": runtime.selected_ssid},
+                                )
+                            await _draw_screen(display, ui, runtime)
+                            continue
+                        if command == "forget" and not (runtime.selected_ssid or runtime.backend_state.wifi_ssid):
+                            runtime.dialog = DialogState(DialogKind.ERROR, "No network", "Select or connect to a network first")
+                            await _draw_screen(display, ui, runtime)
+                            continue
+                        confirm = command in {"virtualhere", "network", "forget", "restart-services", "reboot", "shutdown", "export-logs", "reset-fault"}
                         if confirm:
                             runtime.dialog = DialogState(
                                 DialogKind.CONFIRMATION,
@@ -154,25 +197,6 @@ async def run(config_path: Path | None, display_mode: str, touch_mode: str) -> N
                                 ),
                             )
                             await _draw_screen(display, ui, runtime)
-                        elif command.startswith("ssid:"):
-                            try:
-                                network = runtime.networks[int(command.split(":", 1)[1])]
-                            except (ValueError, IndexError):
-                                network = None
-                            if network:
-                                runtime.selected_ssid = str(network.get("ssid", ""))
-                                if (network.get("security") or "open") == "open":
-                                    runtime.dialog = DialogState(
-                                        DialogKind.CONFIRMATION, "Connect", f"Connect to {runtime.selected_ssid}?",
-                                        command="/network/connect", payload={"ssid": runtime.selected_ssid, "password": ""},
-                                    )
-                                else:
-                                    runtime.entry = TextEntryState(prompt=f"Password for {runtime.selected_ssid}")
-                                    runtime.dialog = DialogState(
-                                        DialogKind.KEYBOARD, "Wi-Fi password", runtime.entry.prompt,
-                                        confirm_label="Connect", command="/network/connect", payload={"ssid": runtime.selected_ssid},
-                                    )
-                                await _draw_screen(display, ui, runtime)
                         elif path and runtime.backend_state.online:
                             result = await api.command(path)
                             if command == "scan" and result.get("ok"):
@@ -195,8 +219,26 @@ async def _draw_screen(display: Display, ui: LocalUI, runtime: LocalUIRuntime) -
         0,
         display.width,
         display.height,
-        ui.render(runtime.screen, scroll_y=runtime.scroll_y, state=runtime.backend_state, dialog=runtime.dialog, entry=runtime.entry, networks=runtime.networks, system_detail=runtime.system_detail),
+        ui.render(
+            runtime.screen,
+            scroll_y=runtime.scroll_y,
+            state=runtime.backend_state,
+            dialog=runtime.dialog,
+            entry=runtime.entry,
+            networks=runtime.networks,
+            system_detail=runtime.system_detail,
+            selected_ssid=runtime.selected_ssid,
+        ),
     )
+
+
+def _selected_network(runtime: LocalUIRuntime) -> dict | None:
+    if not runtime.selected_ssid:
+        return None
+    for network in runtime.networks:
+        if str(network.get("ssid", "")) == runtime.selected_ssid:
+            return network
+    return None
 
 
 def _screen_for_touch(ui: LocalUI, event: TouchEvent, current_screen: ScreenName) -> ScreenName:

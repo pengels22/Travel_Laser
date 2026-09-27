@@ -5,6 +5,7 @@ import logging
 from collections.abc import Awaitable, Callable
 from typing import Protocol
 
+from .events import EventCode, Severity
 from .grbl_parser import parse_error_line, parse_status_line
 from .safety import SafetyController
 from .state import ControllerState, MachineState
@@ -64,6 +65,9 @@ class GrblProxy:
         self._client_connected = False
         self._poll_task: asyncio.Task | None = None
         self._serial_read_task: asyncio.Task | None = None
+        self._recovery_task: asyncio.Task | None = None
+        self._homing_requested = False
+        self._homing_in_progress = False
 
     async def start(self) -> None:
         if self.active:
@@ -78,10 +82,15 @@ class GrblProxy:
             snapshot.machine.state = MachineState.IDLE
 
         await self.state.update(mutate)
+        self.safety.record(EventCode.LASER_USB_CONNECTED, Severity.INFO, "grbl_proxy")
         self._poll_task = asyncio.create_task(self._status_poll_loop())
         self._serial_read_task = asyncio.create_task(self._serial_read_loop())
 
     async def stop(self) -> None:
+        if self._recovery_task and self._recovery_task is not asyncio.current_task():
+            self._recovery_task.cancel()
+            await asyncio.gather(self._recovery_task, return_exceptions=True)
+            self._recovery_task = None
         self.active = False
         if self._poll_task:
             self._poll_task.cancel()
@@ -102,6 +111,7 @@ class GrblProxy:
         def mutate(snapshot):
             snapshot.lightburn.connected = False
             snapshot.lightburn.stream_active = False
+            snapshot.machine.laser_usb_connected = False
             snapshot.machine.connected_to_grbl = False
 
         await self.state.update(mutate)
@@ -126,6 +136,8 @@ class GrblProxy:
         if snapshot.lightburn.stream_active or snapshot.machine.state in {MachineState.RUN, MachineState.HOLD, MachineState.JOG}:
             return False
         await self._write_serial(b"$H\n")
+        self._homing_requested = True
+        self._homing_in_progress = False
         return True
 
     async def jog(self, axis: str, distance: float) -> bool:
@@ -157,6 +169,7 @@ class GrblProxy:
             snapshot.lightburn.connected = True
 
         await self.state.update(connected)
+        self.safety.record(EventCode.LIGHTBURN_CONNECTED, Severity.INFO, "grbl_proxy")
         try:
             while not reader.at_eof():
                 data = await reader.read(4096)
@@ -164,10 +177,14 @@ class GrblProxy:
                     break
                 await self._write_serial(data)
                 if self._is_meaningful_job_traffic(data):
+                    before_stream = (await self.state.snapshot()).lightburn.stream_active
+
                     def mark_stream(snapshot):
                         snapshot.lightburn.stream_active = True
 
                     await self.state.update(mark_stream)
+                    if not before_stream:
+                        self.safety.record(EventCode.LIGHTBURN_STREAM_STARTED, Severity.INFO, "grbl_proxy")
         finally:
             self._client_connected = False
             writer.close()
@@ -177,6 +194,20 @@ class GrblProxy:
     async def handle_serial_line(self, line: str) -> None:
         status = parse_status_line(line)
         error = parse_error_line(line)
+        completed_home = False
+        if status:
+            if status.state == MachineState.HOME and self._homing_requested:
+                self._homing_in_progress = True
+            elif status.state == MachineState.IDLE and self._homing_in_progress:
+                self._homing_requested = False
+                self._homing_in_progress = False
+                completed_home = True
+            elif status.state == MachineState.ALARM:
+                self._homing_requested = False
+                self._homing_in_progress = False
+        if error and error.lower().startswith("alarm:"):
+            self._homing_requested = False
+            self._homing_in_progress = False
 
         def mutate(snapshot):
             if status:
@@ -185,14 +216,24 @@ class GrblProxy:
                 snapshot.machine.wpos = status.wpos
                 snapshot.machine.feed = status.feed
                 snapshot.machine.spindle = status.spindle
+                if completed_home:
+                    snapshot.machine.homed = True
                 if status.state == MachineState.IDLE:
                     snapshot.lightburn.stream_active = False
             if error:
                 snapshot.machine.error = error
                 if error.lower().startswith("alarm:"):
                     snapshot.machine.state = MachineState.ALARM
+                    snapshot.machine.homed = False
 
         await self.state.update(mutate)
+        if error:
+            self.safety.record(
+                EventCode.GRBL_ALARM if error.lower().startswith("alarm:") else EventCode.GRBL_ERROR,
+                Severity.CRITICAL if error.lower().startswith("alarm:") else Severity.WARNING,
+                "grbl",
+                {"line": error},
+            )
 
     async def _status_poll_loop(self) -> None:
         while True:
@@ -202,7 +243,7 @@ class GrblProxy:
                     await self.serial.write(STATUS_QUERY)
                 except Exception as exc:
                     LOGGER.error("laser serial status poll failed: %s", exc)
-                    await self.safety.handle_laser_usb_disconnected()
+                    await self._handle_serial_loss()
                     return
 
     async def _serial_read_loop(self) -> None:
@@ -214,17 +255,67 @@ class GrblProxy:
                 data = await self.serial.read()
             except Exception as exc:
                 LOGGER.error("laser serial read failed: %s", exc)
-                await self.safety.handle_laser_usb_disconnected()
+                await self._handle_serial_loss()
                 return
             if not data:
-                await self.safety.handle_laser_usb_disconnected()
+                await self._handle_serial_loss()
                 return
             pending += data
             lines = pending.split(b"\n")
             pending = lines.pop()
             for line in lines:
                 await self.handle_serial_line(line.decode(errors="replace").rstrip("\r"))
-                await self.handle_serial_line(line)
+
+    async def _handle_serial_loss(self) -> None:
+        self.active = False
+        self._homing_requested = False
+        self._homing_in_progress = False
+        if self._poll_task and self._poll_task is not asyncio.current_task():
+            self._poll_task.cancel()
+            await asyncio.gather(self._poll_task, return_exceptions=True)
+            self._poll_task = None
+        if self._serial_read_task and self._serial_read_task is not asyncio.current_task():
+            self._serial_read_task.cancel()
+            await asyncio.gather(self._serial_read_task, return_exceptions=True)
+            self._serial_read_task = None
+        if self.server:
+            self.server.close()
+            await self.server.wait_closed()
+            self.server = None
+        if self.serial:
+            await self.serial.close()
+            self.serial = None
+
+        def mutate(snapshot):
+            snapshot.lightburn.connected = False
+            snapshot.lightburn.stream_active = False
+            snapshot.machine.laser_usb_connected = False
+            snapshot.machine.connected_to_grbl = False
+            snapshot.machine.homed = False
+
+        await self.state.update(mutate)
+        await self.safety.handle_laser_usb_disconnected()
+        if not self._recovery_task or self._recovery_task.done():
+            self._recovery_task = asyncio.create_task(self._recover_when_safe())
+
+    async def _recover_when_safe(self) -> None:
+        while True:
+            snapshot = await self.state.snapshot()
+            blocked = (
+                not snapshot.physical.k1
+                or snapshot.physical.estop_sense
+                or snapshot.safety.remote_estop
+                or snapshot.safety.software_estop
+                or (snapshot.safety.fire_enabled and snapshot.safety.fire_active)
+            )
+            if not blocked and not self.active:
+                try:
+                    await self.start()
+                    self._recovery_task = None
+                    return
+                except Exception as exc:
+                    LOGGER.warning("laser proxy reconnect waiting for USB: %s", exc)
+            await asyncio.sleep(1.0)
 
     async def _default_serial_factory(self) -> MockSerialEndpoint:
         return MockSerialEndpoint()

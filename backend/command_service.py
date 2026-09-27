@@ -21,19 +21,29 @@ class SystemActions(Protocol):
 
 
 class DefaultSystemActions:
+    helper_path = "/usr/local/sbin/travel-laser-system-action"
+
     async def _run(self, *command: str) -> None:
-        process = await asyncio.create_subprocess_exec(*command)
-        if await process.wait() != 0:
+        process = await asyncio.create_subprocess_exec(
+            *command,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        _, stderr = await process.communicate()
+        if process.returncode != 0:
+            detail = stderr.decode().strip()
+            if detail:
+                raise RuntimeError(detail)
             raise RuntimeError(f"system action failed: {' '.join(command)}")
 
     async def restart(self) -> None:
-        await self._run("systemctl", "restart", "travel-laser-controller.service")
+        await self._run("sudo", "-n", self.helper_path, "restart-services")
 
     async def reboot(self) -> None:
-        await self._run("systemctl", "reboot")
+        await self._run("sudo", "-n", self.helper_path, "reboot")
 
     async def shutdown(self) -> None:
-        await self._run("systemctl", "poweroff")
+        await self._run("sudo", "-n", self.helper_path, "shutdown")
 
 
 class LogExporter(Protocol):
@@ -114,6 +124,12 @@ class ControllerCommandService:
         await self.safety.request_estop(source, reason)
         return self._success("E-stop active")
 
+    async def reset_fault(self) -> CommandResult:
+        ok, reason = await self.safety.reset_fault()
+        if not ok:
+            return self._blocked(reason or "Fault reset blocked", "RESET_FAULT_BLOCKED")
+        return self._success("Fault reset; home before running")
+
     async def network_scan(self) -> CommandResult:
         try:
             networks = await self.network.scan_wifi()
@@ -131,6 +147,8 @@ class ControllerCommandService:
         return self._success("Wi-Fi connection requested")
 
     async def wifi_forget(self, ssid: str) -> CommandResult:
+        if not ssid:
+            return self._blocked("SSID is required", "SSID_REQUIRED")
         try:
             await self.network.forget_wifi(ssid)
         except Exception as exc:
@@ -199,7 +217,7 @@ class ControllerCommandService:
         snapshot = await self.state.snapshot()
         if snapshot.lightburn.stream_active or snapshot.machine.state in {MachineState.RUN, MachineState.HOLD, MachineState.JOG, MachineState.HOME}:
             return self._blocked("Machine is active", "SYSTEM_ACTION_BLOCKED")
-        if snapshot.physical.estop_sense or snapshot.safety.software_estop:
+        if snapshot.physical.estop_sense or snapshot.safety.software_estop or snapshot.safety.remote_estop:
             return self._blocked("Machine has an active fault", "SYSTEM_ACTION_BLOCKED")
         return None
 
@@ -208,7 +226,12 @@ class ControllerCommandService:
             return self._blocked("LightBurn stream is active", "MACHINE_BUSY")
         if snapshot.machine.state in {MachineState.RUN, MachineState.HOLD, MachineState.JOG, MachineState.HOME}:
             return self._blocked("Machine is active", "MACHINE_BUSY")
-        if not allow_fault and (snapshot.physical.estop_sense or snapshot.safety.software_estop or snapshot.machine.state == MachineState.FAULT):
+        if not allow_fault and (
+            snapshot.physical.estop_sense
+            or snapshot.safety.software_estop
+            or snapshot.safety.remote_estop
+            or snapshot.machine.state == MachineState.FAULT
+        ):
             return self._blocked("Machine has an active fault", "MACHINE_FAULT")
         return None
 

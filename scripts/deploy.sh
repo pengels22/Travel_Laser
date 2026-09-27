@@ -7,6 +7,14 @@ CONFIG_DIR="${CONFIG_DIR:-/etc/travel-laser}"
 DEPLOY_ENV="${DEPLOY_ENV:-${CONFIG_DIR}/deployment.env}"
 CONTROLLER_CONFIG="${CONTROLLER_CONFIG:-${CONFIG_DIR}/controller.yaml}"
 START_SERVICES="${START_SERVICES:-true}"
+CHECK_ONLY=false
+
+for arg in "$@"; do
+  case "${arg}" in
+    --check) CHECK_ONLY=true ;;
+    *) echo "Unknown argument: ${arg}" >&2; exit 2 ;;
+  esac
+done
 
 if [[ "${EUID}" -ne 0 ]]; then
   echo "Run this deploy script as root on the Orange Pi." >&2
@@ -14,6 +22,86 @@ if [[ "${EUID}" -ne 0 ]]; then
 fi
 
 mkdir -p "${CONFIG_DIR}"
+
+check_path() {
+  local path="$1"
+  if [[ ! -e "${path}" ]]; then
+    echo "FAIL: ${path} is missing"
+    return 1
+  fi
+  echo "OK: ${path}"
+}
+
+env_has_value() {
+  local key="$1"
+  grep -Eq "^${key}=.+" "${DEPLOY_ENV}"
+}
+
+check_laser_identity() {
+  local count
+  count="$(find /dev/serial/by-id -maxdepth 1 -type l 2>/dev/null | wc -l | tr -d ' ')"
+  if env_has_value LASER_USB_VID || env_has_value LASER_USB_PID || env_has_value LASER_USB_SERIAL || env_has_value LASER_USB_DESCRIPTION; then
+    echo "OK: laser USB identity configured"
+    return 0
+  fi
+  if [[ "${count}" == "1" ]]; then
+    echo "OK: one serial candidate available for laser identity"
+    return 0
+  fi
+  echo "FAIL: laser USB identity is not configured and ${count} serial candidates were found"
+  return 1
+}
+
+check_camera_identity() {
+  local count
+  count="$(find /dev/v4l/by-id -maxdepth 1 -type l 2>/dev/null | wc -l | tr -d ' ')"
+  if env_has_value CAMERA_DEVICE || env_has_value CAMERA_USB_VID || env_has_value CAMERA_USB_PID || env_has_value CAMERA_USB_SERIAL || env_has_value CAMERA_USB_DESCRIPTION; then
+    echo "OK: camera identity configured"
+  elif [[ "${count}" == "1" ]]; then
+    echo "OK: one camera candidate available"
+  else
+    echo "WARN: camera identity is not configured and ${count} camera candidates were found"
+  fi
+}
+
+preflight() {
+  local failed=0
+  [[ -f "${DEPLOY_ENV}" ]] || cp "${SOURCE_DIR}/config/deployment.env.example" "${DEPLOY_ENV}"
+  # shellcheck disable=SC1090
+  source "${DEPLOY_ENV}"
+  check_path /dev/spidev1.1 || failed=1
+  check_path /dev/i2c-2 || failed=1
+  check_path /dev/gpiochip1 || failed=1
+  check_laser_identity || failed=1
+  check_camera_identity
+  if grep -Eq 'bind_to_tailscale:[[:space:]]*true' "${CONTROLLER_CONFIG}" 2>/dev/null || [[ -n "${TRAVEL_LASER_TAILSCALE_IP:-}" ]]; then
+    if [[ -n "${TRAVEL_LASER_TAILSCALE_IP:-}" ]] || tailscale ip -4 >/dev/null 2>&1; then
+      echo "OK: Tailscale address available"
+    else
+      echo "FAIL: Tailscale address unavailable for Tailscale-bound web portal"
+      failed=1
+    fi
+  fi
+  for unit in travel-laser-controller.service travel-laser-ui.service travel-laser-camera.service mediamtx.service; do
+    [[ -f "/etc/systemd/system/${unit}" ]] && echo "OK: ${unit} installed" || echo "WARN: ${unit} not installed yet"
+  done
+  if id travel-laser >/dev/null 2>&1; then
+    for group in gpio i2c spi; do
+      id -nG travel-laser | tr ' ' '\n' | grep -qx "${group}" && echo "OK: travel-laser in ${group}" || {
+        echo "FAIL: travel-laser missing ${group} group"
+        failed=1
+      }
+    done
+  else
+    echo "WARN: travel-laser user not created yet"
+  fi
+  return "${failed}"
+}
+
+if [[ "${CHECK_ONLY}" == "true" ]]; then
+  preflight
+  exit $?
+fi
 
 if [[ "${SOURCE_DIR}" != "${APP_DIR}" ]]; then
   "${SOURCE_DIR}/scripts/install.sh"

@@ -36,7 +36,7 @@ async def test_web_estop_causes_k1_off():
     assert snapshot.physical.k1 is False
 
 
-async def test_software_estop_requires_physical_estop_cycle_to_clear():
+async def test_software_estop_requires_explicit_reset_to_clear():
     state, gpio, safety = await _safety()
     await safety.request_estop(EstopSource.WEB)
     await safety.refresh_physical_inputs()
@@ -53,8 +53,27 @@ async def test_software_estop_requires_physical_estop_cycle_to_clear():
     gpio.estop_sense = False
     await safety.refresh_physical_inputs()
     snapshot = await state.snapshot()
+    assert snapshot.safety.software_estop is True
+    assert snapshot.physical.k1 is False
+
+    ok, reason = await safety.reset_fault()
+    assert ok, reason
+    snapshot = await state.snapshot()
     assert snapshot.safety.software_estop is False
     assert snapshot.physical.k1 is True
+
+
+async def test_reset_fault_blocked_while_physical_estop_active():
+    state, gpio, safety = await _safety()
+    await safety.request_estop(EstopSource.WEB)
+    gpio.estop_sense = True
+    await safety.refresh_physical_inputs()
+    ok, reason = await safety.reset_fault()
+    assert ok is False
+    assert reason == "physical E-stop is active"
+    snapshot = await state.snapshot()
+    assert snapshot.safety.software_estop is True
+    assert snapshot.physical.k1 is False
 
 
 async def test_fire_does_nothing_when_disabled():

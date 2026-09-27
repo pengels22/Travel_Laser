@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from backend.command_service import ControllerCommandService
+from backend.command_service import DefaultSystemActions
 from backend.gpio import MockGPIOBackend
 from backend.grbl_proxy import GrblProxy
 from backend.mode_manager import ModeManager
@@ -50,6 +51,19 @@ async def test_estop_is_always_routed_to_safety(tmp_path: Path):
         await proxy.stop()
 
 
+async def test_reset_fault_routes_through_safety_without_homing(tmp_path: Path):
+    state, _, proxy, commands = await _service(tmp_path)
+    try:
+        await commands.estop(EstopSource.WEB)
+        result = await commands.reset_fault()
+        assert result.ok is True
+        snapshot = await state.snapshot()
+        assert snapshot.safety.software_estop is False
+        assert snapshot.machine.homed is False
+    finally:
+        await proxy.stop()
+
+
 async def test_mode_change_rejects_fault(tmp_path: Path):
     state, _, proxy, commands = await _service(tmp_path)
     try:
@@ -69,3 +83,23 @@ async def test_wifi_scan_returns_structured_result(tmp_path: Path):
         assert result.data == {"networks": []}
     finally:
         await proxy.stop()
+
+
+async def test_default_system_actions_use_narrow_helper(monkeypatch):
+    calls = []
+
+    async def fake_run(self, *command: str) -> None:
+        calls.append(command)
+
+    monkeypatch.setattr(DefaultSystemActions, "_run", fake_run)
+    actions = DefaultSystemActions()
+
+    await actions.restart()
+    await actions.reboot()
+    await actions.shutdown()
+
+    assert calls == [
+        ("sudo", "-n", "/usr/local/sbin/travel-laser-system-action", "restart-services"),
+        ("sudo", "-n", "/usr/local/sbin/travel-laser-system-action", "reboot"),
+        ("sudo", "-n", "/usr/local/sbin/travel-laser-system-action", "shutdown"),
+    ]

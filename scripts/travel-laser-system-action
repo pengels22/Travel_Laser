@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ACTION="${1:-}"
+
+case "${ACTION}" in
+  restart-services)
+    (
+      sleep 1
+      systemctl restart mediamtx.service travel-laser-camera.service travel-laser-ui.service travel-laser-controller.service
+    ) >/dev/null 2>&1 &
+    echo "restart scheduled"
+    ;;
+  reboot)
+    systemctl reboot
+    ;;
+  shutdown)
+    systemctl poweroff
+    ;;
+  *)
+    echo "Usage: $0 {restart-services|reboot|shutdown}" >&2
+    exit 2
+    ;;
+esac

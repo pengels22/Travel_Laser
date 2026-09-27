@@ -80,20 +80,16 @@ def test_web_host_resolves_to_tailscale_ip_when_required():
     assert _resolve_web_host(config) == "100.64.12.34"
 
 
-def test_web_host_requires_tailscale_ip_when_tailscale_only():
+def test_web_host_disables_external_portal_when_tailscale_missing(monkeypatch):
     config = config_from_dict(
         {
             "web": {"bind_to_tailscale": True},
             "network": {"tailscale": {"ip_address": None}},
         }
     )
+    monkeypatch.setattr("backend.main._live_tailscale_ip", lambda: None)
 
-    try:
-        _resolve_web_host(config)
-    except RuntimeError as exc:
-        assert "network.tailscale.ip_address" in str(exc)
-    else:
-        raise AssertionError("expected Tailscale-only web binding to require an IP")
+    assert _resolve_web_host(config) is None
 
 
 def test_mock_web_host_allows_missing_tailscale_ip_on_loopback():

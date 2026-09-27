@@ -14,14 +14,22 @@
 
       <section class="camera">
         <h2>Camera</h2>
+        <p id="camera-status">Camera status unknown</p>
         <div id="camera-frame">
           <span id="camera-placeholder">Camera stream loading</span>
         </div>
       </section>
 
+      <section class="runtime">
+        <p id="mode-status">Mode unknown</p>
+        <p id="network-status">Network status unknown</p>
+      </section>
+
       <section class="actions">
         <button id="home" type="button">HOME</button>
+        <button id="stop" type="button">STOP</button>
         <button id="estop" type="button">E-STOP</button>
+        <button id="reset-fault" type="button">RESET FAULT</button>
       </section>
     </main>
     <script src="/app.js"></script>

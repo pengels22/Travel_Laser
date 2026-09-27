@@ -320,17 +320,39 @@ Render the UI to a development framebuffer:
 - Camera failure is non-fatal.
 - Fire logic remains disabled until real fire hardware is present.
 
+## Implemented Runtime Features
+
+Physically validated: Orange Pi Zero 3 GPIO, ST7796U display on `/dev/spidev1.1`, FT6336U touch on `/dev/i2c-2`, K1 on `/dev/gpiochip1` line 72, power sense line 78, E-stop sense line 79, `end0`, and `wlan0`.
+
+Software implemented: GRBL TCP proxy line parsing, USB-loss disconnect state, guarded laser reconnect, no automatic homed/job recovery, explicit reset-fault command, live diagnostics, touchscreen Wi-Fi scan/select/connect/forget/refresh flows, manual USB log export through the same privileged export script as udev, least-privilege restart/reboot/shutdown helpers, live camera presence state from configured USB identity, live Tailscale status, safe Tailscale-bound web startup, loopback-only default MediaMTX binding, deploy preflight, and VirtualHere mode verification without fake success.
+
+Deployment/physical validation still pending: actual laser USB identity, camera identity/path, real laser GRBL reconnect behavior on hardware, camera stream validation, and VirtualHere service deployment. Fire sensor hardware is unavailable and disabled by default.
+
 ## Deployment
 
 `config/deployment.env.example` defaults to `START_SERVICES=true`.
 
-After the remaining deployment placeholders are completed and the K1 safety wiring is verified, run:
+`/opt/travel-laser-controller` is an installed copy, not a git checkout. Do not
+run `git pull` there. Update the Orange Pi from a real checkout or transfer a
+fresh repository copy, then run the installer from that source directory:
 
 ```bash
-sudo /opt/travel-laser-controller/scripts/deploy.sh
+sudo ./scripts/install.sh
 ```
 
 The deploy script can auto-fill Tailscale IP, a single camera device, and a single laser serial identity when unambiguous.
+
+Preflight without applying config or starting services:
+
+```bash
+sudo ./scripts/deploy.sh --check
+```
+
+After the remaining deployment placeholders are completed and the K1 safety wiring is verified, run:
+
+```bash
+sudo ./scripts/deploy.sh
+```
 
 ## Testing
 

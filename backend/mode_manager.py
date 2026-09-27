@@ -41,7 +41,10 @@ class ModeManager:
                 await self.proxy.start()
             elif target == LaserMode.VIRTUALHERE and not await self.virtualhere.is_active():
                 await self.proxy.stop()
-                await self.virtualhere.start()
+                try:
+                    await self.virtualhere.start()
+                except RuntimeError as exc:
+                    return False, str(exc)
             return True, None
         if snapshot.lightburn.stream_active:
             return False, "cannot switch laser mode while a job stream is active"
@@ -56,7 +59,10 @@ class ModeManager:
         else:
             if self.proxy.active:
                 return False, "GRBL proxy is still active"
-            await self.virtualhere.start()
+            try:
+                await self.virtualhere.start()
+            except RuntimeError as exc:
+                return False, str(exc)
 
         await self._set_state_mode(target)
         self._persist(target)

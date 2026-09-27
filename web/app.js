@@ -12,7 +12,16 @@ async function fetchCameraStatus() {
   const status = document.getElementById("laser-status");
   status.textContent = laserOk ? "LASER OK" : "LASER FAULT";
   status.className = laserOk ? "ok" : "fault";
+  document.getElementById("mode-status").textContent = `Mode: ${state.mode.laser_mode}`;
+  document.getElementById("camera-status").textContent = cameraText(state.camera);
+  document.getElementById("network-status").textContent =
+    `Tailscale: ${state.network.tailscale_status || "unknown"} ${state.network.tailscale_ip || ""}`.trim();
   renderCamera(state.camera);
+}
+
+function cameraText(camera) {
+  const state = camera.connected ? "connected" : "not connected";
+  return `Camera: ${state} (${camera.stream_type || "stream"})`;
 }
 
 function renderCamera(camera) {
@@ -41,13 +50,26 @@ function renderCamera(camera) {
 
 async function post(path) {
   const response = await fetch(path, { method: "POST" });
-  if (!response.ok && path === "/api/home") {
-    window.alert("Home is unavailable while the machine is active.");
+  if (!response.ok) {
+    let message = "Command unavailable.";
+    try {
+      const result = await response.json();
+      message = result.message || message;
+    } catch (_) {
+      // Keep the generic message.
+    }
+    window.alert(message);
   }
 }
 
 document.getElementById("home").addEventListener("click", () => post("/api/home"));
+document.getElementById("stop").addEventListener("click", () => post("/api/stop"));
 document.getElementById("estop").addEventListener("click", () => post("/api/estop"));
+document.getElementById("reset-fault").addEventListener("click", () => {
+  if (window.confirm("Reset fault latch? Home before running.")) {
+    post("/api/reset-fault");
+  }
+});
 
 fetchCameraStatus();
 setInterval(fetchCameraStatus, 1000);

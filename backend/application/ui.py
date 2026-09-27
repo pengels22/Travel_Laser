@@ -113,7 +113,7 @@ class LocalUI:
             Button("STOP", 256, 82, 196, 142),
         )
 
-    def render(self, screen: ScreenName = "home", machine_state: str = "idle", scroll_y: int = 0, state: UIState | None = None, dialog: DialogState | None = None, entry: TextEntryState | None = None, networks: list[dict] | None = None, system_detail: str | None = None) -> bytes:
+    def render(self, screen: ScreenName = "home", machine_state: str = "idle", scroll_y: int = 0, state: UIState | None = None, dialog: DialogState | None = None, entry: TextEntryState | None = None, networks: list[dict] | None = None, system_detail: str | None = None, selected_ssid: str | None = None) -> bytes:
         state = state or UIState(online=True, machine_state=machine_state)
         frame = RGB565Frame(self.width, self.height, BLACK)
         if screen == "home":
@@ -121,7 +121,7 @@ class LocalUI:
         elif screen == "status":
             self._draw_status(frame, scroll_y, state)
         elif screen == "net":
-            self._draw_network(frame, scroll_y, state, networks or [])
+            self._draw_network(frame, scroll_y, state, networks or [], selected_ssid)
         elif screen == "mode":
             self._draw_mode(frame, scroll_y, state)
         elif screen == "system":
@@ -177,7 +177,7 @@ class LocalUI:
             "status": 252,
             "net": 258,
             "mode": CONTENT_HEIGHT,
-            "system": 252,
+            "system": 282,
         }
         return max(0, content_heights[screen] - CONTENT_HEIGHT)
 
@@ -219,6 +219,7 @@ class LocalUI:
                 "spi-i2c",
                 "logs",
                 "export-logs",
+                "reset-fault",
                 "restart-services",
                 "reboot",
                 "shutdown",
@@ -286,7 +287,7 @@ class LocalUI:
             y += 28
         self._draw_scrollbar(frame, "status", scroll_y)
 
-    def _draw_network(self, frame: "RGB565Frame", scroll_y: int, state: UIState, networks: list[dict]) -> None:
+    def _draw_network(self, frame: "RGB565Frame", scroll_y: int, state: UIState, networks: list[dict], selected_ssid: str | None) -> None:
         y_offset = -scroll_y
         frame.fill_rect(18, 56 + y_offset, 214, 74, PANEL)
         frame.rect(18, 56 + y_offset, 214, 74, GRAY)
@@ -306,9 +307,11 @@ class LocalUI:
         row_y = 174 + y_offset
         shown_networks = networks or [{"ssid": "No scan results", "signal": None, "security": ""}]
         for index, network in enumerate(shown_networks[:4]):
-            color = BLUE if index == 0 else DARK
+            del index
+            ssid = str(network.get("ssid", ""))
+            color = BLUE if ssid and ssid == selected_ssid else DARK
             frame.fill_rect(34, row_y, 410, 22, color)
-            frame.text(50, row_y + 8, str(network.get("ssid", ""))[:24], WHITE)
+            frame.text(50, row_y + 8, _clip_middle(ssid, 24), WHITE)
             security = network.get("security") or "open"
             frame.text(360, row_y + 8, "open" if security == "open" else "locked", WHITE)
             row_y += 24
@@ -347,6 +350,7 @@ class LocalUI:
             "SPI / I2C",
             "View Logs",
             "Export Logs to USB",
+            "Reset Fault",
             "Restart Services",
             "Reboot",
             "Shutdown",
@@ -361,12 +365,29 @@ class LocalUI:
 
     def _draw_system_detail(self, frame: "RGB565Frame", state: UIState, detail: str) -> None:
         frame.text(28, 62, "System / " + detail.upper(), WHITE, scale=2)
+        gpio = state.diagnostics.get("gpio", {})
+        services = state.diagnostics.get("services", [])
         rows = {
-            "gpio": (("GPIO status", state.diagnostics.get("gpio_status", "UNVALIDATED")), ("Power Sense", "live state"), ("E-stop Sense", "live state"), ("K1 Relay", "live state")),
-            "usb": (("Laser USB", "connected" if state.laser_usb_connected else "NOT DETECTED"), ("Camera", "connected" if state.camera_connected else "NOT DETECTED")),
-            "spi-i2c": (("SPI device", state.diagnostics.get("spi_device") or "UNVALIDATED"), ("SPI status", state.diagnostics.get("spi_status", "UNVALIDATED")), ("I2C bus", str(state.diagnostics.get("i2c_bus") or "UNVALIDATED")), ("Touch", state.diagnostics.get("touch_status", "UNVALIDATED"))),
-            "logs": (("Event history", "See controller log"), ("Export", "Use Export Logs to USB")),
-        }.get(detail, (("Status", "UNVALIDATED"),))
+            "gpio": (
+                ("GPIO status", state.diagnostics.get("gpio_status", "unknown")),
+                ("Power Sense", str(gpio.get("power_sense", state.power_present))),
+                ("E-stop Sense", str(gpio.get("estop_sense", state.estop_active))),
+                ("K1 Relay", str(gpio.get("k1", state.k1_energized))),
+            ),
+            "usb": (
+                ("Laser USB", "connected" if state.diagnostics.get("laser_usb") else "not detected"),
+                ("Camera", "connected" if state.diagnostics.get("camera_usb") else "not detected"),
+                ("USB devices", str(len(state.diagnostics.get("usb_devices", [])))),
+            ),
+            "spi-i2c": (
+                ("SPI device", state.diagnostics.get("spi_device") or "not configured"),
+                ("SPI status", state.diagnostics.get("spi_status", "unknown")),
+                ("I2C bus", str(state.diagnostics.get("i2c_bus") or "not configured")),
+                ("Touch", state.diagnostics.get("touch_status", "unknown")),
+            ),
+            "logs": tuple((item.get("name", "service")[:20], item.get("status", "unknown")) for item in services[:5])
+            or (("Event history", "No service state"),),
+        }.get(detail, (("Status", "unknown"),))
         y = 104
         for label, value in rows:
             frame.text(36, y, label, WHITE)
@@ -455,3 +476,13 @@ class RGB565Frame:
 
 def _contains(button: Button, x: int, y: int) -> bool:
     return button.x <= x < button.x + button.width and button.y <= y < button.y + button.height
+
+
+def _clip_middle(text: str, width: int) -> str:
+    if len(text) <= width:
+        return text
+    if width <= 3:
+        return text[:width]
+    keep_left = (width - 3) // 2
+    keep_right = width - 3 - keep_left
+    return text[:keep_left] + "..." + text[-keep_right:]
