@@ -26,7 +26,7 @@ function cameraText(camera) {
 
 function renderCamera(camera) {
   const frame = document.getElementById("camera-frame");
-  const streamUrl = camera.stream_url || `${window.location.protocol}//${window.location.hostname}:8889/cam`;
+  const streamUrl = camera.stream_url || `${window.location.protocol}//${window.location.hostname}:8889/cam/`;
   if (camera.stream_type === "webrtc") {
     const existing = frame.querySelector("iframe");
     if (existing && existing.src === streamUrl) return;

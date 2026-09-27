@@ -21,6 +21,7 @@ HEIGHT="${RESOLUTION#*x}"
 
 exec ffmpeg \
   -f v4l2 \
+  -input_format mjpeg \
   -framerate "${FPS}" \
   -video_size "${WIDTH}x${HEIGHT}" \
   -i "${DEVICE}" \
@@ -30,5 +31,6 @@ exec ffmpeg \
   -tune zerolatency \
   -pix_fmt yuv420p \
   -rtsp_transport tcp \
+  -pkt_size 1200 \
   -f rtsp \
   "${RTSP_URL}"

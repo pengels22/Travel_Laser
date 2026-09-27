@@ -82,3 +82,24 @@ button {
 #estop {
   background: #dc2626;
 }
+
+/* Larger camera view */
+main {
+  max-width: 1400px;
+}
+
+.camera {
+  min-height: 600px;
+}
+
+#camera-frame {
+  min-height: 560px;
+}
+
+#camera-frame iframe {
+  min-height: 560px;
+}
+
+.actions {
+  justify-content: center;
+}
