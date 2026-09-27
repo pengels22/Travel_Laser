@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from collections.abc import Awaitable, Callable
 from typing import Protocol
 
@@ -15,6 +16,7 @@ REALTIME_PAUSE = b"!"
 REALTIME_RESUME = b"~"
 REALTIME_STOP = b"\x18"
 STATUS_QUERY = b"?"
+JOB_TRAFFIC_PATTERN = re.compile(rb"(^|\s)(G0|G00|G1|G01|G2|G02|G3|G03|M3|M03|M4|M04|M5|M05)\b", re.IGNORECASE)
 
 
 class MockSerialEndpoint:
@@ -66,6 +68,7 @@ class GrblProxy:
         self._poll_task: asyncio.Task | None = None
         self._serial_read_task: asyncio.Task | None = None
         self._recovery_task: asyncio.Task | None = None
+        self._client_writer: asyncio.StreamWriter | None = None
         self._homing_requested = False
         self._homing_in_progress = False
 
@@ -104,6 +107,11 @@ class GrblProxy:
             self.server.close()
             await self.server.wait_closed()
             self.server = None
+        if self._client_writer:
+            self._client_writer.close()
+            await self._client_writer.wait_closed()
+            self._client_writer = None
+            self._client_connected = False
         if self.serial:
             await self.serial.close()
             self.serial = None
@@ -164,6 +172,9 @@ class GrblProxy:
             await writer.wait_closed()
             return
         self._client_connected = True
+        self._client_writer = writer
+        peer = writer.get_extra_info("peername")
+        LOGGER.info("LightBurn TCP client connected from %s", peer)
 
         def connected(snapshot):
             snapshot.lightburn.connected = True
@@ -187,6 +198,9 @@ class GrblProxy:
                         self.safety.record(EventCode.LIGHTBURN_STREAM_STARTED, Severity.INFO, "grbl_proxy")
         finally:
             self._client_connected = False
+            if self._client_writer is writer:
+                self._client_writer = None
+            LOGGER.info("LightBurn TCP client disconnected")
             writer.close()
             await writer.wait_closed()
             await self.safety.handle_lightburn_disconnect()
@@ -260,11 +274,24 @@ class GrblProxy:
             if not data:
                 await self._handle_serial_loss()
                 return
+            await self._forward_serial_to_client(data)
             pending += data
             lines = pending.split(b"\n")
             pending = lines.pop()
             for line in lines:
                 await self.handle_serial_line(line.decode(errors="replace").rstrip("\r"))
+
+    async def _forward_serial_to_client(self, data: bytes) -> None:
+        writer = self._client_writer
+        if writer is None or writer.is_closing():
+            return
+        try:
+            writer.write(data)
+            await writer.drain()
+        except (ConnectionError, RuntimeError, OSError) as exc:
+            LOGGER.info("LightBurn TCP client write failed: %s", exc)
+            if self._client_writer is writer:
+                self._client_writer = None
 
     async def _handle_serial_loss(self) -> None:
         self.active = False
@@ -321,7 +348,12 @@ class GrblProxy:
         return MockSerialEndpoint()
 
     def _is_meaningful_job_traffic(self, data: bytes) -> bool:
-        stripped = data.strip()
-        if not stripped or stripped in {b"?", b"!", b"~", b"\x18"}:
-            return False
-        return True
+        for command in data.replace(b"\r", b"\n").split(b"\n"):
+            stripped = command.strip()
+            if not stripped or stripped in {b"?", b"!", b"~", b"\x18"}:
+                continue
+            if stripped.startswith((b"$", b"(", b";")):
+                continue
+            if JOB_TRAFFIC_PATTERN.search(stripped):
+                return True
+        return False

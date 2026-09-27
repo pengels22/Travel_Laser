@@ -104,6 +104,65 @@ async def test_serial_multiple_lines_and_partial_read_are_reconstructed():
         await proxy.stop()
 
 
+async def test_serial_bytes_are_forwarded_to_tcp_client():
+    _, _, proxy = await _proxy()
+    try:
+        assert proxy.server is not None
+        assert isinstance(proxy.serial, MockSerialEndpoint)
+        sock = proxy.server.sockets[0]
+        host, port = sock.getsockname()[:2]
+        reader, writer = await asyncio.open_connection(host, port)
+        await _wait_for(lambda: proxy._client_writer is not None)
+
+        await proxy.serial.inject_rx(b"Grbl 1.1h ['$' for help]\r\nok\r\n")
+
+        assert await reader.readuntil(b"ok\r\n") == b"Grbl 1.1h ['$' for help]\r\nok\r\n"
+        writer.close()
+        await writer.wait_closed()
+    finally:
+        await proxy.stop()
+
+
+async def test_lightburn_setup_queries_do_not_mark_job_stream_active():
+    state, _, proxy = await _proxy()
+    try:
+        assert proxy.server is not None
+        assert isinstance(proxy.serial, MockSerialEndpoint)
+        sock = proxy.server.sockets[0]
+        host, port = sock.getsockname()[:2]
+        _, writer = await asyncio.open_connection(host, port)
+
+        writer.write(b"\x18\n$I\n$G\n$$\n?\n")
+        await writer.drain()
+        await asyncio.sleep(0.05)
+
+        snapshot = await state.snapshot()
+        assert snapshot.lightburn.connected is True
+        assert snapshot.lightburn.stream_active is False
+        writer.close()
+        await writer.wait_closed()
+    finally:
+        await proxy.stop()
+
+
+async def test_motion_gcode_marks_job_stream_active():
+    state, _, proxy = await _proxy()
+    try:
+        assert proxy.server is not None
+        sock = proxy.server.sockets[0]
+        host, port = sock.getsockname()[:2]
+        _, writer = await asyncio.open_connection(host, port)
+
+        writer.write(b"G1 X10 Y10 F1000\n")
+        await writer.drain()
+        await _wait_for_stream_active(state)
+
+        writer.close()
+        await writer.wait_closed()
+    finally:
+        await proxy.stop()
+
+
 async def test_homing_sets_homed_only_after_home_to_idle():
     state, _, proxy = await _proxy()
     try:
@@ -143,6 +202,15 @@ async def _wait_for(predicate, timeout: float = 1.0):
             return
         await asyncio.sleep(0.01)
     raise AssertionError("condition was not met")
+
+
+async def _wait_for_stream_active(state: ControllerState, timeout: float = 1.0) -> None:
+    deadline = asyncio.get_running_loop().time() + timeout
+    while asyncio.get_running_loop().time() < deadline:
+        if (await state.snapshot()).lightburn.stream_active:
+            return
+        await asyncio.sleep(0.01)
+    raise AssertionError("stream did not become active")
 
 
 async def _wait_for_state(state: ControllerState, expected: MachineState) -> None:
