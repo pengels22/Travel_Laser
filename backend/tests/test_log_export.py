@@ -52,6 +52,18 @@ def test_usb_partition_detection_accepts_usb_parent_transport() -> None:
     assert _usb_partition_candidates_from_lsblk(output) == ["sda1"]
 
 
+def test_usb_partition_detection_prefers_largest_partition() -> None:
+    output = "\n".join(
+        [
+            'NAME="sda" TYPE="disk" TRAN="usb" SIZE="8053063680" PKNAME=""',
+            'NAME="sda1" TYPE="part" TRAN="" SIZE="209715200" PKNAME="sda"',
+            'NAME="sda2" TYPE="part" TRAN="" SIZE="7843348480" PKNAME="sda"',
+        ]
+    )
+
+    assert _usb_partition_candidates_from_lsblk(output) == ["sda2", "sda1"]
+
+
 def test_usb_partition_detection_rejects_small_usb_partitions() -> None:
     output = "\n".join(
         [

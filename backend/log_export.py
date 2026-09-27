@@ -46,7 +46,7 @@ class USBLogExporter:
     async def _find_usb_block_device(self) -> str | None:
         try:
             process = await asyncio.create_subprocess_exec(
-                "lsblk", "-b", "-P", "-nr", "-o", "NAME,TYPE,TRAN,SIZE,PKNAME",
+                "lsblk", "-b", "-P", "-n", "-o", "NAME,TYPE,TRAN,SIZE,PKNAME",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
@@ -56,8 +56,6 @@ class USBLogExporter:
         if process.returncode != 0:
             return None
         candidates = _usb_partition_candidates_from_lsblk(stdout.decode())
-        if len(candidates) > 1:
-            raise RuntimeError("Multiple eligible USB partitions detected; remove extras and retry")
         return candidates[0] if candidates else None
 
     async def _run_helper(self, device_name: str) -> None:
@@ -87,7 +85,7 @@ class USBLogExporter:
 
     async def _find_usb_mount(self) -> Path | None:
         process = await asyncio.create_subprocess_exec(
-            "lsblk", "-b", "-P", "-nr", "-o", "NAME,TYPE,TRAN,SIZE,MOUNTPOINT,PKNAME",
+            "lsblk", "-b", "-P", "-n", "-o", "NAME,TYPE,TRAN,SIZE,MOUNTPOINT,PKNAME",
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
@@ -123,7 +121,7 @@ def _valid_device_name(value: str) -> bool:
 def _usb_partition_candidates_from_lsblk(output: str, min_bytes: int = 200 * 1024 * 1024) -> list[str]:
     rows = _parse_lsblk_pairs(output)
     transport_by_name = {row.get("NAME", ""): row.get("TRAN", "") for row in rows}
-    candidates: list[str] = []
+    candidates: list[tuple[int, str]] = []
     for row in rows:
         name = row.get("NAME", "")
         if row.get("TYPE") != "part" or not _row_is_usb(row, transport_by_name) or not _valid_device_name(name):
@@ -133,8 +131,8 @@ def _usb_partition_candidates_from_lsblk(output: str, min_bytes: int = 200 * 102
         except ValueError:
             continue
         if size_bytes >= min_bytes:
-            candidates.append(name)
-    return candidates
+            candidates.append((size_bytes, name))
+    return [name for _, name in sorted(candidates, reverse=True)]
 
 
 def _row_is_usb(row: dict[str, str], transport_by_name: dict[str, str]) -> bool:
