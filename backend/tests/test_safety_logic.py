@@ -21,6 +21,17 @@ async def test_physical_estop_causes_k1_off():
     assert snapshot.physical.k1 is False
 
 
+async def test_initialize_safe_preserves_gpio_startup_k1_state():
+    state = ControllerState()
+    gpio = MockGPIOBackend(k1=True)
+    safety = SafetyController(state, gpio)
+
+    await safety.initialize_safe()
+
+    snapshot = await state.snapshot()
+    assert snapshot.physical.k1 is True
+
+
 async def test_local_ui_estop_causes_k1_off():
     state, _, safety = await _safety()
     await safety.request_estop(EstopSource.LOCAL_UI)

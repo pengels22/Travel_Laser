@@ -26,9 +26,10 @@ class SafetyController:
 
     async def initialize_safe(self) -> None:
         await self.gpio.initialize_safe()
+        k1 = bool(getattr(self.gpio, "k1", False))
 
         def mutate(snapshot):
-            snapshot.physical.k1 = False
+            snapshot.physical.k1 = k1
 
         await self.state.update(mutate)
 

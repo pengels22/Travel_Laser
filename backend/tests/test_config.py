@@ -26,6 +26,7 @@ def test_example_config_captures_deployment_defaults():
     assert config.gpio.k1_output.chip == "/dev/gpiochip1"
     assert config.gpio.k1_output.line == 72
     assert config.gpio.k1_output.board_pin == "PC8"
+    assert config.gpio.k1_start_energized is True
 
     assert config.display.controller == "ST7796U"
     assert config.display.width == 480

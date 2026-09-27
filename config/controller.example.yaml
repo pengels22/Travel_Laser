@@ -70,6 +70,10 @@ touch:
   interrupt_gpio_line: null
 
 gpio:
+  # This build powers the laser controller through K1. Keep K1 energized at
+  # controller service startup so a service restart does not latch laser E-stop.
+  k1_start_energized: true
+
   power_input:
     chip: /dev/gpiochip1
     line: 78

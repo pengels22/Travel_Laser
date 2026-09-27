@@ -19,9 +19,10 @@ class MockGPIOBackend:
     power_sense: bool = False
     estop_sense: bool = False
     k1: bool = False
+    k1_start_energized: bool = True
 
     async def initialize_safe(self) -> None:
-        self.k1 = False
+        self.k1 = self.k1_start_energized
 
     async def read_power_sense(self) -> bool:
         return self.power_sense
@@ -39,10 +40,11 @@ class LinuxGPIOBackend:
     def __init__(self, config: GPIOConfig) -> None:
         self.config = config
         self._requests: dict[str, object] = {}
+        self.k1 = False
 
     async def initialize_safe(self) -> None:
         self._ensure_requested()
-        await self.set_k1(False)
+        await self.set_k1(self.config.k1_start_energized)
 
     async def read_power_sense(self) -> bool:
         return await self._read("power_input", self.config.power_input)
@@ -54,6 +56,7 @@ class LinuxGPIOBackend:
 
     async def set_k1(self, energized: bool) -> None:
         await self._write("k1_output", self.config.k1_output, energized)
+        self.k1 = energized
 
     def close(self) -> None:
         for request in self._requests.values():
@@ -96,7 +99,7 @@ class LinuxGPIOBackend:
                 k1.line: gpiod.LineSettings(
                     direction=Direction.OUTPUT,
                     output_value=Value.ACTIVE
-                    if self._physical_value(k1, False)
+                    if self._physical_value(k1, self.config.k1_start_energized)
                     else Value.INACTIVE,
                 )
             },

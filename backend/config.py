@@ -77,6 +77,7 @@ class GPIOConfig:
     power_input: GPIOLineConfig = field(default_factory=GPIOLineConfig)
     estop_input: GPIOLineConfig = field(default_factory=GPIOLineConfig)
     k1_output: GPIOLineConfig = field(default_factory=GPIOLineConfig)
+    k1_start_energized: bool = True
 
 
 @dataclass
@@ -210,6 +211,7 @@ def config_from_dict(raw: dict[str, Any]) -> AppConfig:
             power_input=_gpio_line(gpio.get("power_input", {})),
             estop_input=_gpio_line(gpio.get("estop_input", {})),
             k1_output=_gpio_line(gpio.get("k1_output", {})),
+            k1_start_energized=_as_bool(gpio.get("k1_start_energized", True)),
         ),
         web=WebConfig(
             host=_optional_str(web.get("host", "0.0.0.0")),
