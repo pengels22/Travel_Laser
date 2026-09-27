@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 
 from .touch_interface import TouchEvent, TouchPoint
+
+LOGGER = logging.getLogger(__name__)
 
 
 class FT6336Touch:
@@ -28,24 +31,37 @@ class FT6336Touch:
         self._bus = None
         self._reset_request = None
         self._was_down = False
+        self._read_failures = 0
 
     async def initialize(self) -> None:
-        try:
-            from smbus2 import SMBus
-        except ImportError:
-            from smbus import SMBus
-
         await self._hardware_reset()
-        self._bus = SMBus(self.i2c_bus)
+        self._open_bus()
         await asyncio.sleep(0)
 
     async def read_event(self) -> TouchEvent | None:
         await asyncio.sleep(self.poll_interval)
 
         if self._bus is None:
-            raise RuntimeError("FT6336Touch is not initialized")
+            await self._recover_bus()
+            return None
 
-        data = self._bus.read_i2c_block_data(self.address, 0x02, 11)
+        try:
+            data = self._bus.read_i2c_block_data(self.address, 0x02, 11)
+        except OSError as exc:
+            self._read_failures += 1
+            self._was_down = False
+            if self._read_failures in {1, 10, 100}:
+                LOGGER.warning(
+                    "FT6336 touch read failed on i2c-%s address 0x%02x: %s",
+                    self.i2c_bus,
+                    self.address,
+                    exc,
+                )
+            await self._recover_bus()
+            return None
+
+        self._read_failures = 0
+
         count = data[0] & 0x0F
 
         if count == 0:
@@ -70,6 +86,30 @@ class FT6336Touch:
         if self._reset_request is not None:
             self._reset_request.release()
             self._reset_request = None
+
+    def _open_bus(self) -> None:
+        try:
+            from smbus2 import SMBus
+        except ImportError:
+            from smbus import SMBus
+
+        self._bus = SMBus(self.i2c_bus)
+
+    async def _recover_bus(self) -> None:
+        if self._bus is not None:
+            self._bus.close()
+            self._bus = None
+        await asyncio.sleep(0.10)
+        try:
+            self._open_bus()
+        except OSError as exc:
+            if self._read_failures in {1, 10, 100}:
+                LOGGER.warning(
+                    "FT6336 touch bus reopen failed on i2c-%s address 0x%02x: %s",
+                    self.i2c_bus,
+                    self.address,
+                    exc,
+                )
 
     async def _hardware_reset(self) -> None:
         if self.reset_gpio_line is None:
