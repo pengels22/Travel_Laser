@@ -28,6 +28,7 @@ class LocalControllerAPI:
         app.router.add_post("/commands/estop", self._estop)
         app.router.add_post("/commands/reset-fault", self._reset_fault)
         app.router.add_get("/network/scan", self._network_scan)
+        app.router.add_post("/network/scan", self._network_scan)
         app.router.add_post("/network/connect", self._wifi_connect)
         app.router.add_post("/network/forget", self._wifi_forget)
         app.router.add_post("/mode", self._mode)

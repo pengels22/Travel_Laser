@@ -52,7 +52,17 @@ class LocalAPIClient:
         if self.session is None:
             raise RuntimeError("LocalAPIClient must be used as an async context manager")
         async with self.session.request(method, self.base_url + path, json=payload) as response:
-            body = await response.json()
+            try:
+                body = await response.json()
+            except aiohttp.ContentTypeError:
+                text = await response.text()
+                body = {
+                    "ok": False,
+                    "status": "error",
+                    "code": f"HTTP_{response.status}",
+                    "message": text.strip() or response.reason,
+                    "data": {},
+                }
             if response.status >= 400:
                 return body
             return body

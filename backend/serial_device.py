@@ -5,7 +5,7 @@ import os
 import asyncio
 
 from .config import USBIdentity
-from .usb import USBDevice, matches_identity
+from .usb import USBDevice, device_from_pyudev, matches_identity
 
 
 class AsyncSerialEndpoint:
@@ -30,14 +30,7 @@ def discover_serial_device(identity: USBIdentity) -> str:
     candidates: list[USBDevice] = []
     for link in sorted(glob.glob("/dev/serial/by-id/*")):
         device_node = os.path.realpath(link)
-        properties = _udev_properties(device_node)
-        device = USBDevice(
-            path=link,
-            vid=properties.get("ID_VENDOR_ID"),
-            pid=properties.get("ID_MODEL_ID"),
-            serial=properties.get("ID_SERIAL_SHORT"),
-            description=properties.get("ID_MODEL_FROM_DATABASE") or properties.get("ID_MODEL"),
-        )
+        device = _udev_device(link, device_node)
         if matches_identity(device, identity):
             candidates.append(device)
 
@@ -68,11 +61,18 @@ async def open_laser_serial(identity: USBIdentity, baud: int, timeout: float = 1
     return AsyncSerialEndpoint(reader, writer)
 
 
-def _udev_properties(device_node: str) -> dict[str, str]:
+def _udev_device(path: str, device_node: str) -> USBDevice:
     try:
         import pyudev
     except ImportError:
-        return {}
+        return USBDevice(path=path)
     context = pyudev.Context()
     device = pyudev.Devices.from_device_file(context, device_node)
-    return dict(device.properties)
+    discovered = device_from_pyudev(path, device)
+    return USBDevice(
+        path=path,
+        vid=discovered.vid,
+        pid=discovered.pid,
+        serial=discovered.serial,
+        description=discovered.description,
+    )

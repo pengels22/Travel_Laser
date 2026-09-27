@@ -99,18 +99,17 @@ def enumerate_usb_devices() -> list[USBDevice]:
         node = device.device_node
         if not node:
             continue
-        properties = dict(device.properties)
-        devices.append(_device_from_properties(node, properties))
+        devices.append(device_from_pyudev(node, device))
     for device in context.list_devices(subsystem="video4linux"):
         node = device.device_node
         if not node:
             continue
-        properties = dict(device.properties)
-        devices.append(_device_from_properties(node, properties))
+        devices.append(device_from_pyudev(node, device))
     return devices
 
 
-def _device_from_properties(path: str, properties: dict[str, str]) -> USBDevice:
+def device_from_pyudev(path: str, device) -> USBDevice:
+    properties = _merged_device_properties(device)
     return USBDevice(
         path=path,
         vid=properties.get("ID_VENDOR_ID"),
@@ -118,5 +117,16 @@ def _device_from_properties(path: str, properties: dict[str, str]) -> USBDevice:
         serial=properties.get("ID_SERIAL_SHORT"),
         description=properties.get("ID_MODEL_FROM_DATABASE")
         or properties.get("ID_MODEL")
+        or properties.get("ID_MODEL_ENC")
+        or properties.get("ID_SERIAL")
         or properties.get("ID_V4L_PRODUCT"),
     )
+
+
+def _merged_device_properties(device) -> dict[str, str]:
+    merged: dict[str, str] = {}
+    current = device
+    while current is not None:
+        merged.update({key: str(value) for key, value in dict(current.properties).items()})
+        current = getattr(current, "parent", None)
+    return merged

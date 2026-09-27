@@ -96,6 +96,11 @@ async def run(config_path: Path | None, display_mode: str, touch_mode: str) -> N
                     last_touch_at = now
                     if runtime.dialog:
                         action = _apply_dialog_touch(runtime, event)
+                        if action == "dismiss":
+                            runtime.dialog = None
+                            runtime.entry = None
+                            await _draw_screen(display, ui, runtime)
+                            continue
                         if action and action.startswith("key:") and runtime.entry:
                             runtime.entry.insert(action[4:])
                             await _draw_screen(display, ui, runtime)
@@ -252,7 +257,7 @@ def _apply_dialog_touch(runtime: LocalUIRuntime, event: TouchEvent) -> str | Non
     if event.kind != "up" or not event.points or not runtime.dialog or runtime.dialog.kind == DialogKind.BUSY:
         return None
     if runtime.dialog.kind in {DialogKind.SUCCESS, DialogKind.ERROR}:
-        return "cancel"
+        return "dismiss"
     if runtime.dialog.kind == DialogKind.KEYBOARD:
         point = event.points[0]
         if 302 <= point.x < 380 and 228 <= point.y < 264:
