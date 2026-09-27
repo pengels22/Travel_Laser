@@ -92,7 +92,7 @@ gpio:
     chip: /dev/gpiochip1
     line: 72
     board_pin: PC8
-    active_high: true
+    active_high: false
 
 fire:
   sensor_enabled: false

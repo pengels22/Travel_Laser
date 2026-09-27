@@ -153,6 +153,9 @@ These are configured on `/dev/gpiochip1` on the validated Armbian image.
 
 PC14 is a deterministic external sense signal and uses `bias: none`.
 
+K1 is wired active-low at the GPIO input: normal/reset drives PC8 low, and a
+software E-stop/drop drives PC8 high.
+
 The E-stop feedback loop input has been removed from the active wiring. The controller
 therefore treats feedback as unavailable/inactive and assumes K1 relay wiring performs
 the physical E-stop action.
