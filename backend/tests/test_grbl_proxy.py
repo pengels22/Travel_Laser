@@ -145,6 +145,26 @@ async def test_lightburn_setup_queries_do_not_mark_job_stream_active():
         await proxy.stop()
 
 
+async def test_laser_off_command_does_not_mark_job_stream_active():
+    state, _, proxy = await _proxy()
+    try:
+        assert proxy.server is not None
+        sock = proxy.server.sockets[0]
+        host, port = sock.getsockname()[:2]
+        _, writer = await asyncio.open_connection(host, port)
+
+        writer.write(b"M5\n")
+        await writer.drain()
+        await asyncio.sleep(0.05)
+
+        snapshot = await state.snapshot()
+        assert snapshot.lightburn.stream_active is False
+        writer.close()
+        await writer.wait_closed()
+    finally:
+        await proxy.stop()
+
+
 async def test_motion_gcode_marks_job_stream_active():
     state, _, proxy = await _proxy()
     try:

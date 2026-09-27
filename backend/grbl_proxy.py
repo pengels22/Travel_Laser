@@ -16,7 +16,7 @@ REALTIME_PAUSE = b"!"
 REALTIME_RESUME = b"~"
 REALTIME_STOP = b"\x18"
 STATUS_QUERY = b"?"
-JOB_TRAFFIC_PATTERN = re.compile(rb"(^|\s)(G0|G00|G1|G01|G2|G02|G3|G03|M3|M03|M4|M04|M5|M05)\b", re.IGNORECASE)
+JOB_TRAFFIC_PATTERN = re.compile(rb"(^|\s)(G0|G00|G1|G01|G2|G02|G3|G03|M3|M03|M4|M04)\b", re.IGNORECASE)
 
 
 class MockSerialEndpoint:
