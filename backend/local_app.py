@@ -157,10 +157,16 @@ async def run(config_path: Path | None, display_mode: str, touch_mode: str) -> N
                         if command == "refresh":
                             backend = await api.state()
                             runtime.backend_state = UIState.from_payload(backend.raw, online=backend.online)
+                            runtime.dialog = DialogState(DialogKind.BUSY, "Working", "Refreshing networks")
+                            await _draw_screen(display, ui, runtime)
                             result = await api.command("/network/scan")
                             if result.get("ok"):
                                 runtime.networks = result.get("data", {}).get("networks", [])
-                            runtime.message = result.get("message", "Network state refreshed")
+                            runtime.dialog = DialogState(
+                                DialogKind.SUCCESS if result.get("ok") else DialogKind.ERROR,
+                                "Complete" if result.get("ok") else "Failed",
+                                result.get("message", "Network state refreshed"),
+                            )
                             await _draw_screen(display, ui, runtime)
                             continue
                         if command == "connect":
@@ -203,10 +209,17 @@ async def run(config_path: Path | None, display_mode: str, touch_mode: str) -> N
                             )
                             await _draw_screen(display, ui, runtime)
                         elif path and runtime.backend_state.online:
+                            if command in {"scan", "home", "stop", "estop", "export-logs"}:
+                                runtime.dialog = DialogState(DialogKind.BUSY, "Working", f"Running {command}")
+                                await _draw_screen(display, ui, runtime)
                             result = await api.command(path)
                             if command == "scan" and result.get("ok"):
                                 runtime.networks = result.get("data", {}).get("networks", [])
-                            runtime.message = result.get("message")
+                            runtime.dialog = DialogState(
+                                DialogKind.SUCCESS if result.get("ok") else DialogKind.ERROR,
+                                "Complete" if result.get("ok") else "Failed",
+                                result.get("message", "Command failed"),
+                            )
                             await _draw_screen(display, ui, runtime)
                 elif runtime.dialog is None and _should_return_home(runtime.screen, last_touch_at, now):
                     runtime.screen = "home"

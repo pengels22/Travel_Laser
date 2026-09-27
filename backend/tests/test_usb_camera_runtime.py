@@ -67,3 +67,36 @@ def test_usb_device_from_pyudev_walks_parent_properties():
     assert device.pid == "7523"
     assert device.serial == "LASER1"
     assert device.description == "USB_Serial"
+
+
+def test_usb_device_from_pyudev_prefers_nearest_parent_properties():
+    class FakeDevice:
+        def __init__(self, properties, parent=None):
+            self.properties = properties
+            self.parent = parent
+
+    root_hub = FakeDevice(
+        {
+            "ID_VENDOR_ID": "1d6b",
+            "ID_MODEL_ID": "0001",
+            "ID_SERIAL_SHORT": "root",
+            "ID_MODEL": "root hub",
+        }
+    )
+    usb_device = FakeDevice(
+        {
+            "ID_VENDOR_ID": "1a86",
+            "ID_MODEL_ID": "7523",
+            "ID_SERIAL_SHORT": "LASER1",
+            "ID_MODEL": "USB_Serial",
+        },
+        root_hub,
+    )
+    tty = FakeDevice({"SUBSYSTEM": "tty"}, usb_device)
+
+    device = device_from_pyudev("/dev/ttyUSB0", tty)
+
+    assert device.vid == "1a86"
+    assert device.pid == "7523"
+    assert device.serial == "LASER1"
+    assert device.description == "USB_Serial"

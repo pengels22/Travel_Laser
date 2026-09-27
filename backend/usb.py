@@ -127,6 +127,7 @@ def _merged_device_properties(device) -> dict[str, str]:
     merged: dict[str, str] = {}
     current = device
     while current is not None:
-        merged.update({key: str(value) for key, value in dict(current.properties).items()})
+        for key, value in dict(current.properties).items():
+            merged.setdefault(key, str(value))
         current = getattr(current, "parent", None)
     return merged
