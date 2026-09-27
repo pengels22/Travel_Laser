@@ -31,11 +31,19 @@ class DialogState:
 @dataclass
 class TextEntryState:
     value: str = ""
-    masked: bool = True
+    masked: bool = False
     cursor_position: int = 0
-    shift_enabled: bool = False
+    keyboard_layout: str = "lower"
     max_length: int = 128
     prompt: str = ""
+
+    @property
+    def shift_enabled(self) -> bool:
+        return self.keyboard_layout == "upper"
+
+    @shift_enabled.setter
+    def shift_enabled(self, enabled: bool) -> None:
+        self.keyboard_layout = "upper" if enabled else "lower"
 
     def insert(self, text: str) -> None:
         if len(self.value) + len(text) > self.max_length:
@@ -56,16 +64,37 @@ class TextEntryState:
         return "*" * len(self.value) if self.masked else self.value
 
 
-KEYBOARD_ROWS = (
-    tuple("1234567890"),
-    tuple("qwertyuiop"),
-    tuple("asdfghjkl"),
-    tuple("zxcvbnm"),
-    tuple("!@#$%^&*()-_=+[]{};:'\",./?\\|"),
-)
+KEYBOARD_LAYOUTS = {
+    "lower": (
+        tuple("qwertyuiop"),
+        tuple("asdfghjkl"),
+        tuple("zxcvbnm"),
+    ),
+    "upper": (
+        tuple("QWERTYUIOP"),
+        tuple("ASDFGHJKL"),
+        tuple("ZXCVBNM"),
+    ),
+    "numbers": (
+        tuple("1234567890"),
+        tuple("-/:;()$&@\""),
+        tuple(".,?!'"),
+    ),
+    "symbols": (
+        tuple("[]{}#%^*+="),
+        tuple("_\\|~<>"),
+        tuple("`"),
+    ),
+}
+KEYBOARD_ROWS = KEYBOARD_LAYOUTS["lower"]
+KEYBOARD_LAYOUT_ORDER = tuple(KEYBOARD_LAYOUTS.keys())
+KEYBOARD_LAYOUT_LABELS = {
+    "lower": "abc",
+    "upper": "ABC",
+    "numbers": "123",
+    "symbols": "#+=",
+}
 
 
 def keyboard_key_text(key: str, entry: TextEntryState) -> str:
-    if len(key) == 1 and key.isalpha() and entry.shift_enabled:
-        return key.upper()
     return key

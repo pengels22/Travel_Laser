@@ -14,6 +14,15 @@ def test_text_entry_supports_masking_shift_backspace_and_clear() -> None:
     entry.insert(keyboard_key_text("c", entry))
     entry.backspace()
     assert entry.value == "ab"
+    assert entry.display_value() == "ab"
+    entry.masked = True
     assert entry.display_value() == "**"
     entry.clear()
     assert entry.value == ""
+
+
+def test_text_entry_defaults_to_unmasked_lowercase_keyboard() -> None:
+    entry = TextEntryState(prompt="Wi-Fi password")
+
+    assert not entry.masked
+    assert entry.keyboard_layout == "lower"

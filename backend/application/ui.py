@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from typing import Any
 from typing import Literal
 
-from .dialogs import DialogKind, DialogState, KEYBOARD_ROWS, TextEntryState
+from .dialogs import DialogKind, DialogState, KEYBOARD_LAYOUT_LABELS, KEYBOARD_LAYOUTS, TextEntryState
 from .font5x7 import glyph_for
 
 
@@ -24,6 +24,13 @@ ScreenName = Literal["home", "status", "net", "net_results", "mode", "system"]
 CONTENT_TOP = 44
 CONTENT_BOTTOM = 264
 CONTENT_HEIGHT = CONTENT_BOTTOM - CONTENT_TOP
+KEY_WIDTH = 40
+KEY_HEIGHT = 26
+KEY_GAP = 3
+KEY_ROW_Y = 138
+KEY_ROW_GAP = 5
+KEY_CONTROLS_Y = 226
+KEY_CONTROLS_HEIGHT = 32
 
 
 @dataclass(frozen=True)
@@ -138,24 +145,33 @@ class LocalUI:
         frame.fill_rect(0, 44, self.width, 220, DARK)
         frame.rect(24, 60, 432, 184, RED if dialog.severity == "critical" else BLUE)
         frame.text(48, 78, dialog.title, WHITE, scale=2)
-        frame.text(48, 116, dialog.message[:48], WHITE)
+        if dialog.kind != DialogKind.KEYBOARD:
+            frame.text(48, 116, dialog.message[:48], WHITE)
         if dialog.kind == DialogKind.BUSY:
             frame.text(48, 146, "Please wait...", MUTED)
             return
         if dialog.kind == DialogKind.KEYBOARD:
-            frame.text(48, 140, entry.display_value() if entry else "", WHITE, scale=2)
-            for row_index, row in enumerate(KEYBOARD_ROWS):
+            entry = entry or TextEntryState()
+            frame.text(48, 108, _clip_middle(dialog.message, 48), WHITE)
+            frame.fill_rect(40, 120, 400, 16, PANEL)
+            frame.rect(40, 120, 400, 16, GRAY)
+            frame.text(48, 125, _clip_middle(entry.display_value(), 48), WHITE)
+            rows = KEYBOARD_LAYOUTS.get(entry.keyboard_layout, KEYBOARD_LAYOUTS["lower"])
+            for row_index, row in enumerate(rows):
+                row_width = len(row) * KEY_WIDTH + max(0, len(row) - 1) * KEY_GAP
+                start_x = (self.width - row_width) // 2
                 for key_index, key in enumerate(row[:10]):
-                    x = 40 + key_index * 40
-                    y = 154 + row_index * 18
-                    frame.fill_rect(x, y, 36, 16, PANEL)
-                    label = key.upper() if entry and entry.shift_enabled and key.isalpha() else key
-                    frame.text(x + 12, y + 5, label, WHITE)
-            frame.text(42, 248, "Shift", WHITE)
-            frame.text(142, 248, "Space", WHITE)
-            frame.text(238, 248, "<", WHITE)
-            frame.text(302, 248, "Cancel", WHITE)
-            frame.text(392, 248, "Go", WHITE)
+                    x = start_x + key_index * (KEY_WIDTH + KEY_GAP)
+                    y = KEY_ROW_Y + row_index * (KEY_HEIGHT + KEY_ROW_GAP)
+                    frame.fill_rect(x, y, KEY_WIDTH, KEY_HEIGHT, PANEL)
+                    frame.rect(x, y, KEY_WIDTH, KEY_HEIGHT, GRAY)
+                    frame.text(x + 16, y + 10, key, WHITE)
+            for label, x, width in _keyboard_control_buttons():
+                color = BLUE if label == KEYBOARD_LAYOUT_LABELS.get(entry.keyboard_layout) else DARK
+                frame.fill_rect(x, KEY_CONTROLS_Y, width, KEY_CONTROLS_HEIGHT, color)
+                frame.rect(x, KEY_CONTROLS_Y, width, KEY_CONTROLS_HEIGHT, GRAY)
+                text_x = x + max(6, (width - len(label) * 8) // 2)
+                frame.text(text_x, KEY_CONTROLS_Y + 13, label, WHITE)
             return
         frame.fill_rect(48, 184, 170, 42, DARK)
         frame.rect(48, 184, 170, 42, GRAY)
@@ -495,6 +511,19 @@ class RGB565Frame:
 
 def _contains(button: Button, x: int, y: int) -> bool:
     return button.x <= x < button.x + button.width and button.y <= y < button.y + button.height
+
+
+def _keyboard_control_buttons() -> tuple[tuple[str, int, int], ...]:
+    return (
+        (KEYBOARD_LAYOUT_LABELS["lower"], 24, 44),
+        (KEYBOARD_LAYOUT_LABELS["upper"], 72, 44),
+        (KEYBOARD_LAYOUT_LABELS["numbers"], 120, 44),
+        (KEYBOARD_LAYOUT_LABELS["symbols"], 168, 44),
+        ("Space", 216, 72),
+        ("<-", 292, 36),
+        ("Cancel", 332, 64),
+        ("Go", 400, 56),
+    )
 
 
 def _clip_middle(text: str, width: int) -> str:

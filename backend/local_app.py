@@ -5,8 +5,16 @@ import asyncio
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .application.dialogs import DialogKind, DialogState, KEYBOARD_ROWS, TextEntryState, keyboard_key_text
+from .application.dialogs import (
+    DialogKind,
+    DialogState,
+    KEYBOARD_LAYOUT_LABELS,
+    KEYBOARD_LAYOUTS,
+    TextEntryState,
+    keyboard_key_text,
+)
 from .application.ui import CONTENT_BOTTOM, CONTENT_TOP, LocalUI, ScreenName, UIState
+from .application.ui import KEY_CONTROLS_HEIGHT, KEY_CONTROLS_Y, KEY_GAP, KEY_HEIGHT, KEY_ROW_GAP, KEY_ROW_Y, KEY_WIDTH
 from .config import load_config
 from .display.desktop_display import DesktopDisplay
 from .display.interface import Display, DisplayConfig
@@ -107,6 +115,10 @@ async def run(config_path: Path | None, display_mode: str, touch_mode: str) -> N
                             continue
                         if action == "shift" and runtime.entry:
                             runtime.entry.shift_enabled = not runtime.entry.shift_enabled
+                            await _draw_screen(display, ui, runtime)
+                            continue
+                        if action.startswith("layout:") and runtime.entry:
+                            runtime.entry.keyboard_layout = action.split(":", 1)[1]
                             await _draw_screen(display, ui, runtime)
                             continue
                         if action == "cancel":
@@ -325,23 +337,34 @@ def _apply_dialog_touch(runtime: LocalUIRuntime, event: TouchEvent) -> str | Non
             return "dismiss"
         return None
     if runtime.dialog.kind == DialogKind.KEYBOARD:
-        if 302 <= point.x < 380 and 228 <= point.y < 264:
-            return "cancel"
-        if 380 <= point.x < 460 and 228 <= point.y < 264:
-            return "confirm"
-        if 40 <= point.x < 100 and 228 <= point.y < 264:
-            return "shift"
-        if 100 <= point.x < 220 and 228 <= point.y < 264:
-            return "key: "
-        if 220 <= point.x < 302 and 228 <= point.y < 264:
-            if runtime.entry:
-                runtime.entry.backspace()
-            return None
-        if 40 <= point.x < 440 and 154 <= point.y < 244:
-            row_index = (point.y - 154) // 18
-            key_index = (point.x - 40) // 40
-            if 0 <= row_index < len(KEYBOARD_ROWS) and 0 <= key_index < min(10, len(KEYBOARD_ROWS[row_index])):
-                return "key:" + keyboard_key_text(KEYBOARD_ROWS[row_index][key_index], runtime.entry or TextEntryState())
+        entry = runtime.entry or TextEntryState()
+        if KEY_CONTROLS_Y <= point.y < KEY_CONTROLS_Y + KEY_CONTROLS_HEIGHT:
+            label_to_layout = {label: layout for layout, label in KEYBOARD_LAYOUT_LABELS.items()}
+            for label, x, width in _keyboard_control_buttons():
+                if x <= point.x < x + width:
+                    if label in label_to_layout:
+                        return "layout:" + label_to_layout[label]
+                    if label == "Space":
+                        return "key: "
+                    if label == "<-":
+                        if runtime.entry:
+                            runtime.entry.backspace()
+                        return None
+                    if label == "Cancel":
+                        return "cancel"
+                    if label == "Go":
+                        return "confirm"
+        rows = KEYBOARD_LAYOUTS.get(entry.keyboard_layout, KEYBOARD_LAYOUTS["lower"])
+        for row_index, row in enumerate(rows):
+            y = KEY_ROW_Y + row_index * (KEY_HEIGHT + KEY_ROW_GAP)
+            if not y <= point.y < y + KEY_HEIGHT:
+                continue
+            row_width = len(row) * KEY_WIDTH + max(0, len(row) - 1) * KEY_GAP
+            start_x = (480 - row_width) // 2
+            for key_index, key in enumerate(row[:10]):
+                x = start_x + key_index * (KEY_WIDTH + KEY_GAP)
+                if x <= point.x < x + KEY_WIDTH:
+                    return "key:" + keyboard_key_text(key, entry)
         return None
     if 48 <= point.x < 218 and 184 <= point.y < 226:
         return "cancel"
@@ -418,6 +441,19 @@ def _should_return_home(
     timeout_seconds: float = IDLE_HOME_TIMEOUT_SECONDS,
 ) -> bool:
     return current_screen != "home" and now - last_touch_at >= timeout_seconds
+
+
+def _keyboard_control_buttons() -> tuple[tuple[str, int, int], ...]:
+    return (
+        (KEYBOARD_LAYOUT_LABELS["lower"], 24, 44),
+        (KEYBOARD_LAYOUT_LABELS["upper"], 72, 44),
+        (KEYBOARD_LAYOUT_LABELS["numbers"], 120, 44),
+        (KEYBOARD_LAYOUT_LABELS["symbols"], 168, 44),
+        ("Space", 216, 72),
+        ("<-", 292, 36),
+        ("Cancel", 332, 64),
+        ("Go", 400, 56),
+    )
 
 
 def main() -> None:

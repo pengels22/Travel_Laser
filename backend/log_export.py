@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import re
+import shlex
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -45,7 +46,7 @@ class USBLogExporter:
     async def _find_usb_block_device(self) -> str | None:
         try:
             process = await asyncio.create_subprocess_exec(
-                "lsblk", "-b", "-nr", "-o", "NAME,TYPE,TRAN,SIZE",
+                "lsblk", "-b", "-P", "-nr", "-o", "NAME,TYPE,TRAN,SIZE,PKNAME",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
@@ -54,17 +55,7 @@ class USBLogExporter:
         stdout, _ = await process.communicate()
         if process.returncode != 0:
             return None
-        candidates: list[str] = []
-        for line in stdout.decode().splitlines():
-            fields = line.split()
-            if len(fields) != 4 or fields[1] != "part" or fields[2] != "usb":
-                continue
-            try:
-                size_bytes = int(fields[3])
-            except ValueError:
-                continue
-            if size_bytes >= 200 * 1024 * 1024 and _valid_device_name(fields[0]):
-                candidates.append(fields[0])
+        candidates = _usb_partition_candidates_from_lsblk(stdout.decode())
         if len(candidates) > 1:
             raise RuntimeError("Multiple eligible USB partitions detected; remove extras and retry")
         return candidates[0] if candidates else None
@@ -96,22 +87,26 @@ class USBLogExporter:
 
     async def _find_usb_mount(self) -> Path | None:
         process = await asyncio.create_subprocess_exec(
-            "lsblk", "-b", "-nr", "-o", "TYPE,TRAN,SIZE,MOUNTPOINT",
+            "lsblk", "-b", "-P", "-nr", "-o", "NAME,TYPE,TRAN,SIZE,MOUNTPOINT,PKNAME",
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
         stdout, _ = await process.communicate()
         if process.returncode != 0:
             return None
-        for line in stdout.decode().splitlines():
-            fields = line.split(None, 3)
-            if len(fields) != 4 or fields[0] != "part" or fields[1] != "usb":
+        rows = _parse_lsblk_pairs(stdout.decode())
+        transport_by_name = {row.get("NAME", ""): row.get("TRAN", "") for row in rows}
+        for row in rows:
+            if row.get("TYPE") != "part" or not _row_is_usb(row, transport_by_name):
                 continue
             try:
-                size_bytes = int(fields[2])
+                size_bytes = int(row.get("SIZE", "0"))
             except ValueError:
                 continue
-            mount = Path(fields[3])
+            mountpoint = row.get("MOUNTPOINT", "")
+            if not mountpoint:
+                continue
+            mount = Path(mountpoint)
             if size_bytes >= 200 * 1024 * 1024 and mount.is_dir() and _writable(mount):
                 return mount
         return None
@@ -123,3 +118,40 @@ def _writable(path: Path) -> bool:
 
 def _valid_device_name(value: str) -> bool:
     return bool(re.fullmatch(r"[A-Za-z0-9_.-]+", value)) and ".." not in value
+
+
+def _usb_partition_candidates_from_lsblk(output: str, min_bytes: int = 200 * 1024 * 1024) -> list[str]:
+    rows = _parse_lsblk_pairs(output)
+    transport_by_name = {row.get("NAME", ""): row.get("TRAN", "") for row in rows}
+    candidates: list[str] = []
+    for row in rows:
+        name = row.get("NAME", "")
+        if row.get("TYPE") != "part" or not _row_is_usb(row, transport_by_name) or not _valid_device_name(name):
+            continue
+        try:
+            size_bytes = int(row.get("SIZE", "0"))
+        except ValueError:
+            continue
+        if size_bytes >= min_bytes:
+            candidates.append(name)
+    return candidates
+
+
+def _row_is_usb(row: dict[str, str], transport_by_name: dict[str, str]) -> bool:
+    if row.get("TRAN") == "usb":
+        return True
+    parent = row.get("PKNAME", "")
+    return bool(parent and transport_by_name.get(parent) == "usb")
+
+
+def _parse_lsblk_pairs(output: str) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    for line in output.splitlines():
+        fields: dict[str, str] = {}
+        for token in shlex.split(line):
+            key, separator, value = token.partition("=")
+            if separator:
+                fields[key] = value
+        if fields:
+            rows.append(fields)
+    return rows

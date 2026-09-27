@@ -188,6 +188,7 @@ def test_open_connect_dialog_uses_keyboard_for_secured_network() -> None:
     assert runtime.dialog.kind == DialogKind.KEYBOARD
     assert runtime.dialog.payload == {"ssid": "Lab 42"}
     assert runtime.entry
+    assert not runtime.entry.masked
 
 
 def test_success_dialog_dismisses_from_visible_button_press() -> None:
@@ -219,8 +220,11 @@ def test_keyboard_dialog_buttons_use_press_coordinates() -> None:
         entry=TextEntryState(),
     )
 
+    assert _apply_dialog_touch(runtime, TouchEvent("down", (TouchPoint(0, 52, 160),))) == "key:q"
+    assert _apply_dialog_touch(runtime, TouchEvent("down", (TouchPoint(0, 130, 240),))) == "layout:numbers"
+    runtime.entry.keyboard_layout = "numbers"
     assert _apply_dialog_touch(runtime, TouchEvent("down", (TouchPoint(0, 52, 160),))) == "key:1"
-    assert _apply_dialog_touch(runtime, TouchEvent("down", (TouchPoint(0, 400, 248),))) == "confirm"
+    assert _apply_dialog_touch(runtime, TouchEvent("down", (TouchPoint(0, 420, 240),))) == "confirm"
 
 
 def test_idle_timeout_returns_non_home_screen_home() -> None:

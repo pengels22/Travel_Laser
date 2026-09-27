@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from backend.log_export import USBLogExporter
+from backend.log_export import USBLogExporter, _usb_partition_candidates_from_lsblk
 
 
 class MockExporter(USBLogExporter):
@@ -37,3 +37,27 @@ async def test_log_export_reports_missing_drive(tmp_path: Path) -> None:
         assert "No writable USB" in str(exc)
     else:
         raise AssertionError("expected missing USB export to fail")
+
+
+def test_usb_partition_detection_accepts_usb_parent_transport() -> None:
+    output = "\n".join(
+        [
+            'NAME="sda" TYPE="disk" TRAN="usb" SIZE="8053063680" PKNAME=""',
+            'NAME="sda1" TYPE="part" TRAN="" SIZE="8052015104" PKNAME="sda"',
+            'NAME="mmcblk0" TYPE="disk" TRAN="" SIZE="31914983424" PKNAME=""',
+            'NAME="mmcblk0p1" TYPE="part" TRAN="" SIZE="31800000000" PKNAME="mmcblk0"',
+        ]
+    )
+
+    assert _usb_partition_candidates_from_lsblk(output) == ["sda1"]
+
+
+def test_usb_partition_detection_rejects_small_usb_partitions() -> None:
+    output = "\n".join(
+        [
+            'NAME="sda" TYPE="disk" TRAN="usb" SIZE="100000000" PKNAME=""',
+            'NAME="sda1" TYPE="part" TRAN="" SIZE="100000000" PKNAME="sda"',
+        ]
+    )
+
+    assert _usb_partition_candidates_from_lsblk(output) == []
