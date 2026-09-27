@@ -41,18 +41,16 @@ class NetworkManager:
         if self.dry_run:
             await asyncio.sleep(0)
             return []
-        output = await self._run_nmcli("-t", "-f", "SSID,SIGNAL,SECURITY", "device", "wifi", "list", "ifname", interface)
         networks: list[WifiNetwork] = []
-        for line in output.splitlines():
-            if not line:
-                continue
-            fields = line.split(":", 2)
-            ssid = fields[0]
-            if ssid:
-                signal = fields[1] if len(fields) > 1 else ""
-                security = fields[2] if len(fields) > 2 and fields[2] else "open"
-                networks.append(WifiNetwork(ssid=ssid, signal=int(signal) if signal.isdigit() else None, security=security))
-        return networks
+        try:
+            output = await self._run_nmcli("-t", "-f", "SSID,SIGNAL,SECURITY", "device", "wifi", "list", "ifname", interface)
+            networks = _parse_nmcli_wifi_list(output)
+        except Exception:
+            networks = []
+        if networks:
+            return networks
+        output = await self._run_iw_scan(interface)
+        return _parse_iw_scan(output)
 
     async def connect_wifi(self, ssid: str, password: str, interface: str | None = None) -> bool:
         interface = interface or self.uplink_interface
@@ -110,6 +108,15 @@ class NetworkManager:
     async def _run_nmcli(self, *args: str) -> str:
         return await self._run_command("nmcli", *args)
 
+    async def _run_iw_scan(self, interface: str) -> str:
+        last_error: Exception | None = None
+        for iw_path in ("/usr/sbin/iw", "/sbin/iw", "iw"):
+            try:
+                return await self._run_command(iw_path, "dev", interface, "scan")
+            except Exception as exc:
+                last_error = exc
+        raise RuntimeError(f"iw scan failed: {last_error}")
+
     async def _run_command(self, *args: str) -> str:
         process = await asyncio.create_subprocess_exec(
             *args,
@@ -139,3 +146,70 @@ def _parse_interface_status(interface: str, output: str) -> NetworkInterfaceStat
         ip_address=ip_address,
         ssid=connection if connection and connection != "--" else None,
     )
+
+
+def _parse_nmcli_wifi_list(output: str) -> list[WifiNetwork]:
+    networks: list[WifiNetwork] = []
+    for line in output.splitlines():
+        if not line:
+            continue
+        fields = line.split(":", 2)
+        ssid = fields[0]
+        if ssid:
+            signal = fields[1] if len(fields) > 1 else ""
+            security = fields[2] if len(fields) > 2 and fields[2] else "open"
+            networks.append(WifiNetwork(ssid=ssid, signal=int(signal) if signal.isdigit() else None, security=security))
+    return networks
+
+
+def _parse_iw_scan(output: str) -> list[WifiNetwork]:
+    networks_by_ssid: dict[str, WifiNetwork] = {}
+    block: list[str] = []
+    for line in output.splitlines():
+        if line.startswith("BSS "):
+            _add_iw_network(networks_by_ssid, block)
+            block = [line]
+        elif block:
+            block.append(line)
+    _add_iw_network(networks_by_ssid, block)
+    return sorted(
+        networks_by_ssid.values(),
+        key=lambda network: (network.signal is None, -(network.signal or 0), network.ssid.lower()),
+    )
+
+
+def _add_iw_network(networks_by_ssid: dict[str, WifiNetwork], block: list[str]) -> None:
+    if not block:
+        return
+    ssid: str | None = None
+    signal: int | None = None
+    has_privacy = "Privacy" in block[0]
+    has_wpa = False
+    connected = "(on " in block[0] and "-- associated" in block[0]
+
+    for raw_line in block[1:]:
+        line = raw_line.strip()
+        if line.startswith("SSID:"):
+            ssid = line.partition(":")[2].strip()
+        elif line.startswith("signal:"):
+            signal = _signal_dbm_to_percent(line.partition(":")[2].strip())
+        elif line.startswith("capability:") and "Privacy" in line:
+            has_privacy = True
+        elif line.startswith("RSN:") or line.startswith("WPA:"):
+            has_wpa = True
+
+    if not ssid:
+        return
+    security = "WPA/WPA2" if has_wpa else "WEP" if has_privacy else "open"
+    network = WifiNetwork(ssid=ssid, signal=signal, security=security, connected=connected)
+    existing = networks_by_ssid.get(ssid)
+    if existing is None or (network.signal or 0) > (existing.signal or 0):
+        networks_by_ssid[ssid] = network
+
+
+def _signal_dbm_to_percent(value: str) -> int | None:
+    try:
+        dbm = float(value.split()[0])
+    except (ValueError, IndexError):
+        return None
+    return max(0, min(100, int(round(2 * (dbm + 100)))))

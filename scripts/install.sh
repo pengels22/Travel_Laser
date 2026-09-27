@@ -27,6 +27,7 @@ apt-get install -y \
   git \
   gpiod \
   i2c-tools \
+  iw \
   jq \
   libgpiod-dev \
   network-manager \

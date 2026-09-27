@@ -18,6 +18,7 @@ CONFIG_MAP = {
     "CAMERA_USB_PID": ("camera", "usb", "pid"),
     "CAMERA_USB_SERIAL": ("camera", "usb", "serial"),
     "CAMERA_USB_DESCRIPTION": ("camera", "usb", "description_contains"),
+    "CAMERA_DEVICE": ("camera", "device"),
     "CAMERA_STREAM_URL": ("camera", "stream_url"),
     "DISPLAY_SPI_DEVICE": ("display", "spi_device"),
     "TOUCH_I2C_BUS": ("touch", "i2c_bus"),

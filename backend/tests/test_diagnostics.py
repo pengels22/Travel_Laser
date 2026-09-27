@@ -47,3 +47,36 @@ async def test_diagnostics_provider_maps_runtime_state_and_usb_devices():
     assert snapshot.diagnostics.laser_usb["serial"] == "LASER1"
     assert snapshot.diagnostics.camera_usb["serial"] == "CAM1"
     assert snapshot.diagnostics.network["tailscale"]["ip_address"] == "100.64.1.2"
+
+
+async def test_diagnostics_uses_configured_camera_device_path(tmp_path):
+    camera_node = tmp_path / "video1"
+    camera_node.touch()
+    by_id = tmp_path / "usb-camera-video-index0"
+    by_id.symlink_to(camera_node)
+
+    config = AppConfig()
+    config.camera.device = str(by_id)
+    config.camera.usb = USBIdentity(vid="0c45", pid="6366")
+    state = ControllerState()
+    gpio = MockGPIOBackend(power_sense=True)
+
+    def devices():
+        return [
+            USBDevice(path=str(camera_node), vid="0c45", pid="6366", serial="SN0001", description="USB Camera"),
+            USBDevice(path=str(tmp_path / "video2"), vid="0c45", pid="6366", serial="SN0001", description="USB Camera"),
+        ]
+
+    provider = DiagnosticsProvider(
+        config,
+        state,
+        gpio,
+        MockNetwork(dry_run=True),
+        CameraAdapter(device_path=str(by_id), identity=config.camera.usb, device_provider=devices),
+        VirtualHereService(dry_run=True),
+        device_provider=devices,
+    )
+
+    diagnostics = await provider.collect()
+
+    assert diagnostics["camera_usb"]["path"] == str(camera_node)

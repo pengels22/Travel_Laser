@@ -122,11 +122,16 @@ async def run(config_path: Path | None, display_mode: str, touch_mode: str) -> N
                             await _draw_screen(display, ui, runtime)
                             result = await api.command(command or "", payload)
                             runtime.entry = None
-                            runtime.dialog = DialogState(
-                                DialogKind.SUCCESS if result.get("ok") else DialogKind.ERROR,
-                                "Complete" if result.get("ok") else "Failed",
-                                result.get("message", "Command failed"),
-                            )
+                            if command == "/network/connect" and result.get("ok"):
+                                runtime.screen = "net"
+                                runtime.scroll_y = 0
+                                runtime.dialog = None
+                            else:
+                                runtime.dialog = DialogState(
+                                    DialogKind.SUCCESS if result.get("ok") else DialogKind.ERROR,
+                                    "Complete" if result.get("ok") else "Failed",
+                                    result.get("message", "Command failed"),
+                                )
                             await _draw_screen(display, ui, runtime)
                     elif _apply_touch(ui, runtime, event, now=now):
                         await _draw_screen(display, ui, runtime)
@@ -140,10 +145,23 @@ async def run(config_path: Path | None, display_mode: str, touch_mode: str) -> N
                         path = {
                             "home": "/commands/home", "stop": "/commands/stop", "estop": "/commands/estop",
                             "scan": "/network/scan", "export-logs": "/logs/export",
-                            "network": "/mode", "virtualhere": "/mode",
+                            "network": "/mode", "virtualhere": "/mode", "results": None, "back-net": None,
                             "forget": "/network/forget", "reset-fault": "/commands/reset-fault",
                             "restart-services": "/system/restart", "reboot": "/system/reboot", "shutdown": "/system/shutdown",
                         }.get(command)
+                        if command == "back-net":
+                            runtime.screen = "net"
+                            runtime.scroll_y = 0
+                            await _draw_screen(display, ui, runtime)
+                            continue
+                        if command == "results":
+                            if runtime.networks:
+                                runtime.screen = "net_results"
+                                runtime.scroll_y = 0
+                            else:
+                                runtime.dialog = DialogState(DialogKind.ERROR, "No results", "Run a Wi-Fi scan first")
+                            await _draw_screen(display, ui, runtime)
+                            continue
                         if command.startswith("ssid:"):
                             try:
                                 network = runtime.networks[int(command.split(":", 1)[1])]
@@ -151,7 +169,7 @@ async def run(config_path: Path | None, display_mode: str, touch_mode: str) -> N
                                 network = None
                             if network:
                                 runtime.selected_ssid = str(network.get("ssid", ""))
-                                runtime.message = f"Selected {runtime.selected_ssid}"
+                                _open_connect_dialog(runtime, network)
                                 await _draw_screen(display, ui, runtime)
                             continue
                         if command == "refresh":
@@ -162,11 +180,11 @@ async def run(config_path: Path | None, display_mode: str, touch_mode: str) -> N
                             result = await api.command("/network/scan")
                             if result.get("ok"):
                                 runtime.networks = result.get("data", {}).get("networks", [])
-                            runtime.dialog = DialogState(
-                                DialogKind.SUCCESS if result.get("ok") else DialogKind.ERROR,
-                                "Complete" if result.get("ok") else "Failed",
-                                result.get("message", "Network state refreshed"),
-                            )
+                                runtime.screen = "net_results"
+                                runtime.scroll_y = 0
+                                runtime.dialog = None
+                            else:
+                                runtime.dialog = DialogState(DialogKind.ERROR, "Failed", result.get("message", "Network scan failed"))
                             await _draw_screen(display, ui, runtime)
                             continue
                         if command == "connect":
@@ -215,11 +233,15 @@ async def run(config_path: Path | None, display_mode: str, touch_mode: str) -> N
                             result = await api.command(path)
                             if command == "scan" and result.get("ok"):
                                 runtime.networks = result.get("data", {}).get("networks", [])
-                            runtime.dialog = DialogState(
-                                DialogKind.SUCCESS if result.get("ok") else DialogKind.ERROR,
-                                "Complete" if result.get("ok") else "Failed",
-                                result.get("message", "Command failed"),
-                            )
+                                runtime.screen = "net_results"
+                                runtime.scroll_y = 0
+                                runtime.dialog = None
+                            else:
+                                runtime.dialog = DialogState(
+                                    DialogKind.SUCCESS if result.get("ok") else DialogKind.ERROR,
+                                    "Complete" if result.get("ok") else "Failed",
+                                    result.get("message", "Command failed"),
+                                )
                             await _draw_screen(display, ui, runtime)
                 elif runtime.dialog is None and _should_return_home(runtime.screen, last_touch_at, now):
                     runtime.screen = "home"
@@ -259,6 +281,30 @@ def _selected_network(runtime: LocalUIRuntime) -> dict | None:
     return None
 
 
+def _open_connect_dialog(runtime: LocalUIRuntime, network: dict) -> None:
+    ssid = str(network.get("ssid", ""))
+    security = network.get("security") or "open"
+    if security == "open":
+        runtime.entry = None
+        runtime.dialog = DialogState(
+            DialogKind.CONFIRMATION,
+            "Connect",
+            f"Connect to {ssid}?",
+            command="/network/connect",
+            payload={"ssid": ssid, "password": ""},
+        )
+        return
+    runtime.entry = TextEntryState(prompt=f"Password for {ssid}")
+    runtime.dialog = DialogState(
+        DialogKind.KEYBOARD,
+        "Wi-Fi password",
+        runtime.entry.prompt,
+        confirm_label="Connect",
+        command="/network/connect",
+        payload={"ssid": ssid},
+    )
+
+
 def _screen_for_touch(ui: LocalUI, event: TouchEvent, current_screen: ScreenName) -> ScreenName:
     if event.kind != "down" or not event.points:
         return current_screen
@@ -267,12 +313,18 @@ def _screen_for_touch(ui: LocalUI, event: TouchEvent, current_screen: ScreenName
 
 
 def _apply_dialog_touch(runtime: LocalUIRuntime, event: TouchEvent) -> str | None:
-    if event.kind != "up" or not event.points or not runtime.dialog or runtime.dialog.kind == DialogKind.BUSY:
+    if not runtime.dialog or runtime.dialog.kind == DialogKind.BUSY:
         return None
+    if event.kind not in {"down", "up"} or not event.points:
+        return None
+    point = event.points[0]
     if runtime.dialog.kind in {DialogKind.SUCCESS, DialogKind.ERROR}:
-        return "dismiss"
+        if 48 <= point.x < 218 and 184 <= point.y < 226:
+            return "dismiss"
+        if 262 <= point.x < 432 and 184 <= point.y < 226:
+            return "dismiss"
+        return None
     if runtime.dialog.kind == DialogKind.KEYBOARD:
-        point = event.points[0]
         if 302 <= point.x < 380 and 228 <= point.y < 264:
             return "cancel"
         if 380 <= point.x < 460 and 228 <= point.y < 264:
@@ -291,7 +343,6 @@ def _apply_dialog_touch(runtime: LocalUIRuntime, event: TouchEvent) -> str | Non
             if 0 <= row_index < len(KEYBOARD_ROWS) and 0 <= key_index < min(10, len(KEYBOARD_ROWS[row_index])):
                 return "key:" + keyboard_key_text(KEYBOARD_ROWS[row_index][key_index], runtime.entry or TextEntryState())
         return None
-    point = event.points[0]
     if 48 <= point.x < 218 and 184 <= point.y < 226:
         return "cancel"
     if 262 <= point.x < 432 and 184 <= point.y < 226:
@@ -301,10 +352,12 @@ def _apply_dialog_touch(runtime: LocalUIRuntime, event: TouchEvent) -> str | Non
 
 def _apply_touch(ui: LocalUI, runtime: LocalUIRuntime, event: TouchEvent, now: float = 0.0) -> bool:
     if event.kind == "up":
+        pending_control = None if runtime.drag_moved else runtime.pending_control
         runtime.drag_last_y = None
         runtime.drag_moved = False
         runtime.drag_pending_control = False
         runtime.drag_pending_started_at = 0.0
+        runtime.pending_control = pending_control
         return False
     if not event.points:
         return False
@@ -351,7 +404,7 @@ def _apply_touch(ui: LocalUI, runtime: LocalUIRuntime, event: TouchEvent, now: f
     if abs(delta_y) < SCROLL_REDRAW_DELTA_PIXELS:
         return False
 
-    next_scroll = ui.clamp_scroll(runtime.screen, runtime.scroll_y - delta_y)
+    next_scroll = ui.clamp_scroll(runtime.screen, runtime.scroll_y - delta_y, runtime.networks)
     changed = next_scroll != runtime.scroll_y
     runtime.scroll_y = next_scroll
     runtime.drag_moved = runtime.drag_moved or changed

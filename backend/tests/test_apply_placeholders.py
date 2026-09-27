@@ -48,6 +48,7 @@ def test_apply_placeholders_updates_controller_config(tmp_path: Path) -> None:
     config = yaml.safe_load(config_path.read_text())
     assert config["network"]["tailscale"]["ip_address"] == "100.64.12.34"
     assert config["laser"]["usb"]["description_contains"] == "CH340"
+    assert config["camera"]["device"] == "/dev/v4l/by-id/test-camera"
     assert config["camera"]["stream_url"] == "http://travel-laser:8889/cam"
     assert config["display"]["spi_device"] == "/dev/spidev1.1"
     assert config["touch"]["i2c_bus"] == 2

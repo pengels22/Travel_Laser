@@ -77,13 +77,13 @@ class USBDeviceManager:
 def matches_identity(device: USBDevice, identity: USBIdentity) -> bool:
     checks: list[bool] = []
     if identity.vid:
-        checks.append((device.vid or "").lower() == identity.vid.lower())
+        checks.append((device.vid or "").lower() == str(identity.vid).lower())
     if identity.pid:
-        checks.append((device.pid or "").lower() == identity.pid.lower())
+        checks.append((device.pid or "").lower() == str(identity.pid).lower())
     if identity.serial:
-        checks.append(device.serial == identity.serial)
+        checks.append(device.serial == str(identity.serial))
     if identity.description_contains:
-        checks.append(identity.description_contains.lower() in (device.description or "").lower())
+        checks.append(str(identity.description_contains).lower() in (device.description or "").lower())
     return all(checks) if checks else True
 
 
@@ -115,11 +115,7 @@ def device_from_pyudev(path: str, device) -> USBDevice:
         vid=properties.get("ID_VENDOR_ID"),
         pid=properties.get("ID_MODEL_ID"),
         serial=properties.get("ID_SERIAL_SHORT"),
-        description=properties.get("ID_MODEL_FROM_DATABASE")
-        or properties.get("ID_MODEL")
-        or properties.get("ID_MODEL_ENC")
-        or properties.get("ID_SERIAL")
-        or properties.get("ID_V4L_PRODUCT"),
+        description=_combined_description(properties),
     )
 
 
@@ -131,3 +127,18 @@ def _merged_device_properties(device) -> dict[str, str]:
             merged.setdefault(key, str(value))
         current = getattr(current, "parent", None)
     return merged
+
+
+def _combined_description(properties: dict[str, str]) -> str | None:
+    values = [
+        properties.get("ID_MODEL_FROM_DATABASE"),
+        properties.get("ID_MODEL"),
+        properties.get("ID_MODEL_ENC"),
+        properties.get("ID_SERIAL"),
+        properties.get("ID_V4L_PRODUCT"),
+    ]
+    unique = []
+    for value in values:
+        if value and value not in unique:
+            unique.append(value)
+    return " ".join(unique) if unique else None

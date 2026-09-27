@@ -9,6 +9,7 @@ def test_example_config_captures_deployment_defaults():
     assert config.controller.hostname == "Travel-Laser"
     assert config.laser.tcp_port == 23
     assert config.laser.baud == 115200
+    assert config.camera.device is None
     assert config.camera.stream_type == "webrtc"
     assert config.camera.resolution == "highest_available"
 
@@ -67,6 +68,32 @@ def test_example_config_captures_deployment_defaults():
 def test_uppercase_fire_sensor_false_parses_false():
     config = config_from_dict({"FIRE_SENSOR": "FALSE"})
     assert config.fire.sensor_enabled is False
+
+
+def test_usb_identity_values_are_normalized_to_strings():
+    config = config_from_dict(
+        {
+            "laser": {
+                "usb": {
+                    "vid": "1a86",
+                    "pid": 7523,
+                    "serial": 5310400,
+                    "description_contains": "USB_Serial",
+                }
+            }
+        }
+    )
+
+    assert config.laser.usb.vid == "1a86"
+    assert config.laser.usb.pid == "7523"
+    assert config.laser.usb.serial == "5310400"
+    assert config.laser.usb.description_contains == "USB_Serial"
+
+
+def test_camera_device_path_is_loaded_from_config():
+    config = config_from_dict({"camera": {"device": "/dev/v4l/by-id/test-camera"}})
+
+    assert config.camera.device == "/dev/v4l/by-id/test-camera"
 
 
 def test_web_host_resolves_to_tailscale_ip_when_required():

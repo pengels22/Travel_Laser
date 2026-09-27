@@ -29,6 +29,7 @@ class LaserConfig:
 class CameraConfig:
     enabled: bool = True
     usb: USBIdentity = field(default_factory=USBIdentity)
+    device: str | None = None
     stream_url: str | None = None
     stream_type: str = "webrtc"
     resolution: str = "highest_available"
@@ -176,6 +177,7 @@ def config_from_dict(raw: dict[str, Any]) -> AppConfig:
         camera=CameraConfig(
             enabled=bool(camera.get("enabled", True)),
             usb=_usb_identity(camera.get("usb", {})),
+            device=_optional_str(camera.get("device")),
             stream_url=camera.get("stream_url"),
             stream_type=str(camera.get("stream_type", "webrtc")),
             resolution=str(camera.get("resolution", "highest_available")),
@@ -243,10 +245,10 @@ def config_from_dict(raw: dict[str, Any]) -> AppConfig:
 
 def _usb_identity(raw: dict[str, Any]) -> USBIdentity:
     return USBIdentity(
-        vid=raw.get("vid"),
-        pid=raw.get("pid"),
-        serial=raw.get("serial"),
-        description_contains=raw.get("description_contains"),
+        vid=_optional_str(raw.get("vid")),
+        pid=_optional_str(raw.get("pid")),
+        serial=_optional_str(raw.get("serial")),
+        description_contains=_optional_str(raw.get("description_contains")),
     )
 
 

@@ -39,7 +39,7 @@ env_has_value() {
 
 check_laser_identity() {
   local count
-  count="$(find /dev/serial/by-id -maxdepth 1 -type l 2>/dev/null | wc -l | tr -d ' ')"
+  count="$( (find /dev/serial/by-id -maxdepth 1 -type l 2>/dev/null || true) | wc -l | tr -d ' ')"
   if env_has_value LASER_USB_VID || env_has_value LASER_USB_PID || env_has_value LASER_USB_SERIAL || env_has_value LASER_USB_DESCRIPTION; then
     echo "OK: laser USB identity configured"
     return 0
@@ -54,7 +54,7 @@ check_laser_identity() {
 
 check_camera_identity() {
   local count
-  count="$(find /dev/v4l/by-id -maxdepth 1 -type l 2>/dev/null | wc -l | tr -d ' ')"
+  count="$( (find /dev/v4l/by-id -maxdepth 1 -type l 2>/dev/null || true) | wc -l | tr -d ' ')"
   if env_has_value CAMERA_DEVICE || env_has_value CAMERA_USB_VID || env_has_value CAMERA_USB_PID || env_has_value CAMERA_USB_SERIAL || env_has_value CAMERA_USB_DESCRIPTION; then
     echo "OK: camera identity configured"
   elif [[ "${count}" == "1" ]]; then

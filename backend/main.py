@@ -74,6 +74,7 @@ async def run(config_path: Path | None, mock: bool) -> None:
         stream_url=config.camera.stream_url,
         stream_type=config.camera.stream_type,
         identity=config.camera.usb if config.camera.enabled else None,
+        device_path=config.camera.device if config.camera.enabled else None,
     )
     diagnostics = DiagnosticsProvider(config, state, gpio, network, camera, virtualhere)
     commands = ControllerCommandService(state, safety, proxy, mode_manager, network, event_sink=event_logger)

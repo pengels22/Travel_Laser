@@ -45,7 +45,7 @@ class DiagnosticsProvider:
         snapshot = await self.state.snapshot()
         devices = await asyncio.to_thread(self.device_provider)
         laser = _single_match(devices, self.config.laser.usb)
-        camera = _single_match(devices, self.config.camera.usb) if self.config.camera.enabled else None
+        camera = _camera_match(devices, self.config.camera.device, self.config.camera.usb) if self.config.camera.enabled else None
         services = await self._service_statuses()
         ethernet = await self.network.interface_status(self.config.network.ethernet_interface)
         wifi = await self.network.interface_status(self.config.network.uplink_wifi_interface)
@@ -147,3 +147,20 @@ def _path_status(path: str | None) -> str:
 def _single_match(devices: list[USBDevice], identity) -> USBDevice | None:
     matches = [device for device in devices if matches_identity(device, identity)]
     return matches[0] if len(matches) == 1 else None
+
+
+def _camera_match(devices: list[USBDevice], configured_path: str | None, identity) -> USBDevice | None:
+    if configured_path:
+        resolved = _resolve_path(configured_path)
+        for device in devices:
+            if device.path == configured_path or _resolve_path(device.path) == resolved:
+                return device
+        return USBDevice(path=configured_path) if Path(configured_path).exists() else None
+    return _single_match(devices, identity)
+
+
+def _resolve_path(path: str) -> str:
+    try:
+        return str(Path(path).resolve())
+    except OSError:
+        return path

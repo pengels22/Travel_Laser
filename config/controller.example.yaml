@@ -17,6 +17,7 @@ laser:
 
 camera:
   enabled: true
+  device: null
   stream_type: webrtc
   resolution: highest_available
   usb:

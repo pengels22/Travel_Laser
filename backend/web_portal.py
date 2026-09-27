@@ -33,6 +33,7 @@ class WebPortal:
 
     async def start(self) -> None:
         app = web.Application()
+        app.router.add_get("/", self._index)
         app.router.add_get("/api/status", self._status)
         app.router.add_post("/api/home", self._home)
         app.router.add_post("/api/stop", self._stop)
@@ -48,6 +49,9 @@ class WebPortal:
         if self.runner:
             await self.runner.cleanup()
             self.runner = None
+
+    async def _index(self, _: web.Request) -> web.FileResponse:
+        return web.FileResponse(self.static_dir / "index.html")
 
     async def _status(self, _: web.Request) -> web.Response:
         return web.json_response(await self.state.to_dict())

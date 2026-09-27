@@ -1,6 +1,6 @@
 from backend.camera import CameraAdapter
 from backend.config import USBIdentity
-from backend.usb import USBDevice, USBDeviceManager, device_from_pyudev
+from backend.usb import USBDevice, USBDeviceManager, device_from_pyudev, matches_identity
 
 
 def _devices():
@@ -43,6 +43,17 @@ async def test_camera_status_reports_present_device():
 
     assert status["connected"] is True
     assert status["device_path"] == "/dev/video-camera"
+
+
+async def test_camera_status_uses_configured_device_path(tmp_path):
+    device = tmp_path / "video-camera"
+    device.touch()
+    camera = CameraAdapter(device_path=str(device), identity=USBIdentity(serial="MISSING"), device_provider=lambda: [])
+
+    status = await camera.status()
+
+    assert status["connected"] is True
+    assert status["device_path"] == str(device)
 
 
 def test_usb_device_from_pyudev_walks_parent_properties():
@@ -100,3 +111,30 @@ def test_usb_device_from_pyudev_prefers_nearest_parent_properties():
     assert device.pid == "7523"
     assert device.serial == "LASER1"
     assert device.description == "USB_Serial"
+
+
+def test_usb_device_description_combines_database_and_model_names():
+    class FakeDevice:
+        def __init__(self, properties, parent=None):
+            self.properties = properties
+            self.parent = parent
+
+    device = device_from_pyudev(
+        "/dev/ttyUSB0",
+        FakeDevice(
+            {
+                "ID_VENDOR_ID": "1a86",
+                "ID_MODEL_ID": "7523",
+                "ID_MODEL_FROM_DATABASE": "CH340 serial converter",
+                "ID_MODEL": "USB_Serial",
+            }
+        ),
+    )
+
+    assert device.description == "CH340 serial converter USB_Serial"
+
+
+def test_usb_identity_match_tolerates_numeric_pid():
+    device = USBDevice(path="/dev/ttyUSB0", vid="1a86", pid="7523", description="USB_Serial")
+
+    assert matches_identity(device, USBIdentity(pid=7523))

@@ -20,7 +20,7 @@ PANEL_ALT = 0x2946
 GRAY = 0x632C
 MUTED = 0xBDF7
 
-ScreenName = Literal["home", "status", "net", "mode", "system"]
+ScreenName = Literal["home", "status", "net", "net_results", "mode", "system"]
 CONTENT_TOP = 44
 CONTENT_BOTTOM = 264
 CONTENT_HEIGHT = CONTENT_BOTTOM - CONTENT_TOP
@@ -122,7 +122,9 @@ class LocalUI:
         elif screen == "status":
             self._draw_status(frame, scroll_y, state)
         elif screen == "net":
-            self._draw_network(frame, scroll_y, state, networks or [], selected_ssid)
+            self._draw_network(frame, scroll_y, state)
+        elif screen == "net_results":
+            self._draw_network_results(frame, scroll_y, networks or [], selected_ssid)
         elif screen == "mode":
             self._draw_mode(frame, scroll_y, state)
         elif screen == "system":
@@ -172,18 +174,19 @@ class LocalUI:
                 return screen_name
         return None
 
-    def max_scroll(self, screen: ScreenName) -> int:
+    def max_scroll(self, screen: ScreenName, networks: list[dict] | None = None) -> int:
         content_heights: dict[ScreenName, int] = {
             "home": CONTENT_HEIGHT,
             "status": 252,
             "net": 258,
+            "net_results": 72 + max(1, len(networks or [])) * 34,
             "mode": CONTENT_HEIGHT,
             "system": 282,
         }
         return max(0, content_heights[screen] - CONTENT_HEIGHT)
 
-    def clamp_scroll(self, screen: ScreenName, scroll_y: int) -> int:
-        return max(0, min(self.max_scroll(screen), scroll_y))
+    def clamp_scroll(self, screen: ScreenName, scroll_y: int, networks: list[dict] | None = None) -> int:
+        return max(0, min(self.max_scroll(screen, networks), scroll_y))
 
     def hit_content_control(self, screen: ScreenName, x: int, y: int, scroll_y: int = 0, networks: list[dict] | None = None) -> str | None:
         content_y = y + scroll_y
@@ -193,18 +196,21 @@ class LocalUI:
                     return button.label.lower()
             return None
         if screen == "net":
-            for index in range(min(4, len(networks or []))):
-                row = Button(f"ssid:{index}", 34, 174 + index * 24, 410, 22)
+            for button in (
+                Button("scan", 18, 224, 100, 34),
+                Button("results", 130, 224, 110, 34),
+                Button("forget", 252, 224, 100, 34),
+                Button("refresh", 364, 224, 98, 34),
+            ):
+                if _contains(button, x, y):
+                    return button.label
+        if screen == "net_results":
+            if _contains(Button("back-net", 18, 224, 100, 34), x, y):
+                return "back-net"
+            for index in range(len(networks or [])):
+                row = Button(f"ssid:{index}", 24, 68 + index * 34, 424, 30)
                 if _contains(row, x, content_y):
                     return row.label
-            for button in (
-                Button("scan", 18, 260, 100, 36),
-                Button("connect", 130, 260, 110, 36),
-                Button("forget", 252, 260, 100, 36),
-                Button("refresh", 364, 260, 98, 36),
-            ):
-                if _contains(button, x, content_y):
-                    return button.label
         if screen == "mode":
             for button in (
                 Button("network", 24, 66, 432, 72),
@@ -245,7 +251,7 @@ class LocalUI:
             ("home", "status", "net", "mode", "system"),
             strict=True,
         ):
-            color = BLUE if screen_name == active_screen else DARK
+            color = BLUE if screen_name == active_screen or (screen_name == "net" and active_screen == "net_results") else DARK
             frame.fill_rect(button.x, button.y, button.width, button.height, color)
             frame.rect(button.x, button.y, button.width, button.height, GRAY)
             if screen_name == "net":
@@ -288,7 +294,7 @@ class LocalUI:
             y += 28
         self._draw_scrollbar(frame, "status", scroll_y)
 
-    def _draw_network(self, frame: "RGB565Frame", scroll_y: int, state: UIState, networks: list[dict], selected_ssid: str | None) -> None:
+    def _draw_network(self, frame: "RGB565Frame", scroll_y: int, state: UIState) -> None:
         y_offset = -scroll_y
         frame.fill_rect(18, 56 + y_offset, 214, 74, PANEL)
         frame.rect(18, 56 + y_offset, 214, 74, GRAY)
@@ -302,32 +308,45 @@ class LocalUI:
         frame.text(336, 80 + y_offset, state.wifi_ssid or "Offline", MUTED)
         frame.text(264, 108 + y_offset, state.wifi_ip or "No address", MUTED)
 
-        frame.fill_rect(18, 140 + y_offset, 444, 112, PANEL)
-        frame.rect(18, 140 + y_offset, 444, 112, GRAY)
-        frame.text(36, 160 + y_offset, "Available Wi-Fi Networks", MUTED)
-        row_y = 174 + y_offset
-        shown_networks = networks or [{"ssid": "No scan results", "signal": None, "security": ""}]
-        for index, network in enumerate(shown_networks[:4]):
-            del index
-            ssid = str(network.get("ssid", ""))
-            color = BLUE if ssid and ssid == selected_ssid else DARK
-            frame.fill_rect(34, row_y, 410, 22, color)
-            frame.text(50, row_y + 8, _clip_middle(ssid, 24), WHITE)
-            security = network.get("security") or "open"
-            frame.text(360, row_y + 8, "open" if security == "open" else "locked", WHITE)
-            row_y += 24
+        frame.fill_rect(18, 140 + y_offset, 444, 68, PANEL)
+        frame.rect(18, 140 + y_offset, 444, 68, GRAY)
+        frame.text(36, 160 + y_offset, "Scan, then choose a network", WHITE, scale=2)
+        frame.text(36, 190 + y_offset, "Current: " + (state.wifi_ssid or "not connected"), MUTED)
 
         toolbar = (
-            Button("Scan", 18, 260 + y_offset, 100, 36),
-            Button("Connect", 130, 260 + y_offset, 110, 36),
-            Button("Forget", 252, 260 + y_offset, 100, 36),
-            Button("Refresh", 364, 260 + y_offset, 98, 36),
+            Button("Scan", 18, 224, 100, 34),
+            Button("Results", 130, 224, 110, 34),
+            Button("Forget", 252, 224, 100, 34),
+            Button("Refresh", 364, 224, 98, 34),
         )
         for button in toolbar:
             frame.fill_rect(button.x, button.y, button.width, button.height, DARK)
             frame.rect(button.x, button.y, button.width, button.height, GRAY)
             frame.text(button.x + 20, button.y + 14, button.label, WHITE)
         self._draw_scrollbar(frame, "net", scroll_y)
+
+    def _draw_network_results(self, frame: "RGB565Frame", scroll_y: int, networks: list[dict], selected_ssid: str | None) -> None:
+        frame.text(26, 58 - scroll_y, "Select Wi-Fi Network", WHITE, scale=2)
+        if not networks:
+            frame.fill_rect(24, 96 - scroll_y, 424, 50, PANEL)
+            frame.rect(24, 96 - scroll_y, 424, 50, GRAY)
+            frame.text(44, 116 - scroll_y, "No scan results", MUTED)
+        for index, network in enumerate(networks):
+            y = 68 + index * 34 - scroll_y
+            ssid = str(network.get("ssid", ""))
+            color = BLUE if ssid and ssid == selected_ssid else PANEL
+            frame.fill_rect(24, y, 424, 30, color)
+            frame.rect(24, y, 424, 30, GRAY)
+            frame.text(42, y + 11, _clip_middle(ssid, 28), WHITE)
+            signal = network.get("signal")
+            security = network.get("security") or "open"
+            frame.text(288, y + 11, f"{signal}%" if signal is not None else "--", MUTED)
+            frame.text(352, y + 11, "open" if security == "open" else "locked", WHITE)
+        back = Button("Back", 18, 224, 100, 34)
+        frame.fill_rect(back.x, back.y, back.width, back.height, DARK)
+        frame.rect(back.x, back.y, back.width, back.height, GRAY)
+        frame.text(back.x + 24, back.y + 14, back.label, WHITE)
+        self._draw_scrollbar(frame, "net_results", scroll_y, networks)
 
     def _draw_mode(self, frame: "RGB565Frame", scroll_y: int, state: UIState) -> None:
         y_offset = -scroll_y
@@ -395,8 +414,8 @@ class LocalUI:
             frame.text(260, y, str(value)[:24], MUTED)
             y += 30
 
-    def _draw_scrollbar(self, frame: "RGB565Frame", screen: ScreenName, scroll_y: int) -> None:
-        max_scroll = self.max_scroll(screen)
+    def _draw_scrollbar(self, frame: "RGB565Frame", screen: ScreenName, scroll_y: int, networks: list[dict] | None = None) -> None:
+        max_scroll = self.max_scroll(screen, networks)
         if max_scroll <= 0:
             return
         track_y = CONTENT_TOP + 6
