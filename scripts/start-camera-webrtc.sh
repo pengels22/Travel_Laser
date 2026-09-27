@@ -29,5 +29,6 @@ exec ffmpeg \
   -preset ultrafast \
   -tune zerolatency \
   -pix_fmt yuv420p \
+  -rtsp_transport tcp \
   -f rtsp \
   "${RTSP_URL}"

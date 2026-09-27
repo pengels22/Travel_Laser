@@ -2,7 +2,7 @@ webrtc: yes
 # Safe default: local publisher and local WebRTC only. If remote camera viewing
 # is required, bind WebRTC explicitly to the Tailscale address during deployment
 # or set camera.stream_url to a separately secured endpoint.
-webrtcAddress: 127.0.0.1:8889
+webrtcAddress: 100.115.122.66:8889
 rtspAddress: 127.0.0.1:8554
 
 paths:
