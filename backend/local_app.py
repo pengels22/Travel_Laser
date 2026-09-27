@@ -117,7 +117,7 @@ async def run(config_path: Path | None, display_mode: str, touch_mode: str) -> N
                             runtime.entry.shift_enabled = not runtime.entry.shift_enabled
                             await _draw_screen(display, ui, runtime)
                             continue
-                        if action.startswith("layout:") and runtime.entry:
+                        if action and action.startswith("layout:") and runtime.entry:
                             runtime.entry.keyboard_layout = action.split(":", 1)[1]
                             await _draw_screen(display, ui, runtime)
                             continue
@@ -145,6 +145,7 @@ async def run(config_path: Path | None, display_mode: str, touch_mode: str) -> N
                                     result.get("message", "Command failed"),
                                 )
                             await _draw_screen(display, ui, runtime)
+                        continue
                     elif _apply_touch(ui, runtime, event, now=now):
                         await _draw_screen(display, ui, runtime)
                     if event.kind == "up" and runtime.pending_control:
