@@ -18,9 +18,9 @@ def test_example_config_captures_deployment_defaults():
     assert config.gpio.power_input.board_pin == "PC14"
     assert config.gpio.power_input.active_high is True
 
-    assert config.gpio.estop_input.chip == "/dev/gpiochip1"
-    assert config.gpio.estop_input.line == 79
-    assert config.gpio.estop_input.board_pin == "PC15"
+    assert config.gpio.estop_input.chip is None
+    assert config.gpio.estop_input.line is None
+    assert config.gpio.estop_input.board_pin is None
     assert config.gpio.estop_input.active_high is False
 
     assert config.gpio.k1_output.chip == "/dev/gpiochip1"

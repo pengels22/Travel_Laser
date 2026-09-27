@@ -78,9 +78,9 @@ gpio:
     active_high: true
 
   estop_input:
-    chip: /dev/gpiochip1
-    line: 79
-    board_pin: PC15
+    chip: null
+    line: null
+    board_pin: null
     bias: none
     active_high: false
 

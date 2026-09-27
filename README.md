@@ -146,12 +146,16 @@ Existing Travel-Laser project GPIO assignments:
 | Function | SoC pin | Linux line | Header pin | Direction |
 | --- | --- | ---: | ---: | --- |
 | Power sense | PC14 | 78 | 18 | Input |
-| E-stop sense | PC15 | 79 | 16 | Input |
+| E-stop feedback sense | n/a | n/a | n/a | Not configured |
 | K1 relay | PC8 | 72 | 15 | Output |
 
 These are configured on `/dev/gpiochip1` on the validated Armbian image.
 
-PC14/PC15 are deterministic external sense signals and use `bias: none`.
+PC14 is a deterministic external sense signal and uses `bias: none`.
+
+The E-stop feedback loop input has been removed from the active wiring. The controller
+therefore treats feedback as unavailable/inactive and assumes K1 relay wiring performs
+the physical E-stop action.
 
 ## Software Architecture
 
@@ -322,7 +326,7 @@ Render the UI to a development framebuffer:
 
 ## Implemented Runtime Features
 
-Physically validated: Orange Pi Zero 3 GPIO, ST7796U display on `/dev/spidev1.1`, FT6336U touch on `/dev/i2c-2`, K1 on `/dev/gpiochip1` line 72, power sense line 78, E-stop sense line 79, `end0`, and `wlan0`.
+Physically validated: Orange Pi Zero 3 GPIO, ST7796U display on `/dev/spidev1.1`, FT6336U touch on `/dev/i2c-2`, K1 on `/dev/gpiochip1` line 72, power sense line 78, `end0`, and `wlan0`. E-stop feedback is not configured in the current wiring.
 
 Software implemented: GRBL TCP proxy line parsing, USB-loss disconnect state, guarded laser reconnect, no automatic homed/job recovery, explicit reset-fault command, live diagnostics, touchscreen Wi-Fi scan/select/connect/forget/refresh flows, manual USB log export through the same privileged export script as udev, least-privilege restart/reboot/shutdown helpers, live camera presence state from configured USB identity, live Tailscale status, safe Tailscale-bound web startup, loopback-only default MediaMTX binding, deploy preflight, and VirtualHere mode verification without fake success.
 

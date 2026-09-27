@@ -48,6 +48,8 @@ class LinuxGPIOBackend:
         return await self._read("power_input", self.config.power_input)
 
     async def read_estop_sense(self) -> bool:
+        if not _line_configured(self.config.estop_input):
+            return False
         return await self._read("estop_input", self.config.estop_input)
 
     async def set_k1(self, energized: bool) -> None:
@@ -70,18 +72,20 @@ class LinuxGPIOBackend:
         except ImportError as exc:
             raise RuntimeError("LinuxGPIOBackend requires libgpiod Python v2 bindings") from exc
 
-        self._requests["power_input"] = self._request_input(
-            gpiod,
-            Direction,
-            self.config.power_input,
-            "travel-laser-power-input",
-        )
-        self._requests["estop_input"] = self._request_input(
-            gpiod,
-            Direction,
-            self.config.estop_input,
-            "travel-laser-estop-input",
-        )
+        if _line_configured(self.config.power_input):
+            self._requests["power_input"] = self._request_input(
+                gpiod,
+                Direction,
+                self.config.power_input,
+                "travel-laser-power-input",
+            )
+        if _line_configured(self.config.estop_input):
+            self._requests["estop_input"] = self._request_input(
+                gpiod,
+                Direction,
+                self.config.estop_input,
+                "travel-laser-estop-input",
+            )
 
         k1 = self.config.k1_output
         self._validate_line(k1, "k1_output")
@@ -118,6 +122,8 @@ class LinuxGPIOBackend:
     async def _read(self, name: str, line_config: GPIOLineConfig) -> bool:
         await asyncio.sleep(0)
         self._ensure_requested()
+        if not _line_configured(line_config):
+            return False
 
         from gpiod.line import Value
 
@@ -154,6 +160,10 @@ def _chip_path(chip: str | None) -> str:
     if not chip:
         raise ValueError("GPIO chip is required")
     return chip if chip.startswith("/") else f"/dev/{chip}"
+
+
+def _line_configured(line_config: GPIOLineConfig) -> bool:
+    return bool(line_config.chip) and line_config.line is not None
 
 
 def _bias_value(Bias, value: str):
