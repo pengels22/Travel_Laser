@@ -10,13 +10,24 @@ async function fetchCameraStatus() {
     state.machine.connected_to_grbl &&
     !state.safety.software_estop;
   const status = document.getElementById("laser-status");
-  status.textContent = laserOk ? "LASER OK" : "LASER FAULT";
+  status.textContent = laserOk ? "LASER OK" : faultText(state);
   status.className = laserOk ? "ok" : "fault";
   document.getElementById("mode-status").textContent = `Mode: ${state.mode.laser_mode}`;
   document.getElementById("camera-status").textContent = cameraText(state.camera);
   document.getElementById("network-status").textContent =
     `Tailscale: ${state.network.tailscale_status || "unknown"} ${state.network.tailscale_ip || ""}`.trim();
   renderCamera(state.camera);
+}
+
+function faultText(state) {
+  if (state.machine?.error) return `FAULT: ${state.machine.error}`;
+  if (state.safety?.software_estop) return "FAULT: SOFTWARE E-STOP";
+  if (state.physical?.estop_sense) return "FAULT: E-STOP";
+  if (!state.physical?.k1) return "FAULT: K1 DROPPED";
+  if (!state.machine?.laser_usb_connected) return "FAULT: LASER USB MISSING";
+  if (!state.machine?.connected_to_grbl) return "FAULT: GRBL DISCONNECTED";
+  if (!state.physical?.power_sense) return "FAULT: POWER OFF";
+  return `FAULT: ${(state.machine?.state || "UNKNOWN").toUpperCase()}`;
 }
 
 function cameraText(camera) {

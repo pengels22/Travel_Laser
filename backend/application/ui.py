@@ -104,6 +104,24 @@ class UIState:
             diagnostics=payload.get("diagnostics", {}),
         )
 
+    @property
+    def status_text(self) -> str:
+        if not self.online:
+            return "Offline"
+        if self.faults:
+            return self.faults[0]
+        if self.machine_state == "fault":
+            if self.estop_active:
+                return "E-stop active"
+            if not self.k1_energized:
+                return "K1 dropped"
+            if not self.laser_usb_connected:
+                return "Laser USB missing"
+            if not self.grbl_connected:
+                return "GRBL disconnected"
+            return "Fault"
+        return self.machine_state.title()
+
 
 class LocalUI:
     def __init__(self, width: int = 480, height: int = 320) -> None:
@@ -260,7 +278,7 @@ class LocalUI:
             frame.text(286, 14, "Offline", WHITE)
         else:
             frame.fill_circle(272, 21, 6, GREEN if state.machine_state == "idle" else YELLOW)
-            frame.text(286, 14, state.machine_state.title(), WHITE)
+            frame.text(286, 14, _clip_middle(state.status_text, 20), WHITE)
 
         for button, screen_name in zip(
             self.nav_buttons,
@@ -287,11 +305,12 @@ class LocalUI:
             frame.fill_rect(button.x, button.y, button.width, button.height, color)
             frame.rect(button.x, button.y, button.width, button.height, GRAY)
             frame.text(button.x + 54, button.y + 52, button.label, WHITE, scale=3)
-        frame.text(176, 244, "Ready to operate" if state.grbl_connected else "Waiting for laser", MUTED)
+        footer = "Ready to operate" if state.grbl_connected else _clip_middle(state.status_text, 26)
+        frame.text(176, 244, footer, MUTED)
 
     def _draw_status(self, frame: "RGB565Frame", scroll_y: int, state: UIState) -> None:
         rows = (
-            ("GRBL State", state.machine_state.title(), GREEN if state.grbl_connected else YELLOW),
+            ("GRBL State", state.status_text, GREEN if state.grbl_connected else YELLOW),
             ("LightBurn", "Connected" if state.lightburn_connected else "Disconnected", GREEN if state.lightburn_connected else GRAY),
             ("Active Stream", "Active" if state.lightburn_stream_active else "None", RED if state.lightburn_stream_active else GRAY),
             ("Power", "12V OK" if state.power_present else "Off", GREEN if state.power_present else GRAY),

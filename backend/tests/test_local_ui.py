@@ -55,6 +55,17 @@ def test_ui_state_comes_from_controller_payload_and_supports_offline() -> None:
     assert len(LocalUI().render("home", state=offline)) == 480 * 320 * 2
 
 
+def test_ui_state_status_text_prefers_specific_fault() -> None:
+    state = UIState.from_payload(
+        {
+            "machine": {"state": "fault", "error": "LASER_NOT_FOUND"},
+            "physical": {"k1": True},
+        }
+    )
+
+    assert state.status_text == "LASER_NOT_FOUND"
+
+
 def test_local_ui_nav_hit_testing() -> None:
     ui = LocalUI()
 
