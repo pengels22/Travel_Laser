@@ -5,6 +5,7 @@ from typing import Any
 from typing import Literal
 
 from .dialogs import DialogKind, DialogState, KEYBOARD_ROWS, TextEntryState
+from .font5x7 import glyph_for
 
 
 BLACK = 0x0000
@@ -466,11 +467,10 @@ class RGB565Frame:
             cursor += 8 * scale
 
     def _glyph(self, x: int, y: int, char: str, color: int, scale: int) -> None:
-        code = ord(char)
-        for row in range(7):
-            bits = ((code << row) ^ (code >> (row % 3))) & 0x1F
-            for col in range(5):
-                if bits & (1 << col):
+        glyph = glyph_for(char)
+        for row, pixels in enumerate(glyph):
+            for col, pixel in enumerate(pixels):
+                if pixel != ".":
                     self.fill_rect(x + col * scale, y + row * scale, scale, scale, color)
 
 

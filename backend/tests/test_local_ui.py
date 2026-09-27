@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from backend.application.ui import LocalUI, UIState
+from backend.application.ui import RGB565Frame, WHITE
 from backend.input.touch_interface import TouchEvent, TouchPoint
 from backend.local_app import LocalUIRuntime, _apply_touch, _screen_for_touch, _should_return_home
 
@@ -12,6 +13,23 @@ def test_local_ui_renders_all_primary_screens() -> None:
         frame = ui.render(screen)
 
         assert len(frame) == ui.width * ui.height * 2
+
+
+def test_text_renderer_uses_real_5x7_font() -> None:
+    frame = RGB565Frame(8, 8)
+    frame.text(0, 0, "A", WHITE)
+    white = WHITE.to_bytes(2, "big")
+
+    def lit(x: int, y: int) -> bool:
+        start = (y * frame.width + x) * 2
+        return frame.data[start:start + 2] == white
+
+    assert lit(1, 0)
+    assert lit(2, 0)
+    assert lit(3, 0)
+    assert lit(0, 3)
+    assert lit(4, 3)
+    assert not lit(0, 0)
 
 
 def test_ui_state_comes_from_controller_payload_and_supports_offline() -> None:
