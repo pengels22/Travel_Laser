@@ -101,6 +101,8 @@ class ControllerCommandService:
         self.log_exporter = log_exporter or DefaultLogExporter()
         self.event_sink = event_sink
         self._transition_lock = asyncio.Lock()
+        self.recovery_connect_timeout_seconds = 10.0
+        self.recovery_home_timeout_seconds = 30.0
 
     async def home(self) -> CommandResult:
         snapshot = await self.state.snapshot()
@@ -124,11 +126,38 @@ class ControllerCommandService:
         await self.safety.request_estop(source, reason)
         return self._success("E-stop active")
 
+    async def custom_m112_estop(self) -> CommandResult:
+        self.safety.record(EventCode.CUSTOM_M112_ESTOP, Severity.CRITICAL, "grbl_proxy")
+        return await self.estop(EstopSource.LIGHTBURN, "custom M112 from LightBurn")
+
     async def reset_fault(self) -> CommandResult:
+        return await self.recover_to_ready()
+
+    async def recover_to_ready(self) -> CommandResult:
+        self.safety.record(EventCode.CUSTOM_M113_RECOVERY_STARTED, Severity.INFO, "command_service")
         ok, reason = await self.safety.reset_fault()
         if not ok:
-            return self._blocked(reason or "Fault reset blocked", "RESET_FAULT_BLOCKED")
-        return self._success("Fault reset; home before running")
+            result = self._blocked(reason or "Fault reset blocked", "RESET_FAULT_BLOCKED")
+            self._record_recovery_failed(result)
+            return result
+        if not await self._wait_for_k1_energized(timeout=2.0):
+            result = self._error("K1 did not energize during recovery", "K1_NOT_ENERGIZED")
+            self._record_recovery_failed(result)
+            return result
+        if not await self.proxy.ensure_connected(timeout=self.recovery_connect_timeout_seconds):
+            result = self._error("GRBL did not reconnect during recovery", "GRBL_NOT_CONNECTED")
+            self._record_recovery_failed(result)
+            return result
+        if not await self.proxy.home():
+            result = self._blocked("Home is unavailable while the machine is active", "HOME_BLOCKED")
+            self._record_recovery_failed(result)
+            return result
+        if not await self.proxy.wait_for_homing_complete(timeout=self.recovery_home_timeout_seconds):
+            result = self._error("Homing did not complete during recovery", "HOME_TIMEOUT")
+            self._record_recovery_failed(result)
+            return result
+        self.safety.record(EventCode.CUSTOM_M113_RECOVERY_COMPLETE, Severity.INFO, "command_service")
+        return self._success("Fault reset and homing complete")
 
     async def network_scan(self) -> CommandResult:
         try:
@@ -220,6 +249,22 @@ class ControllerCommandService:
         if snapshot.physical.estop_sense or snapshot.safety.software_estop or snapshot.safety.remote_estop:
             return self._blocked("Machine has an active fault", "SYSTEM_ACTION_BLOCKED")
         return None
+
+    async def _wait_for_k1_energized(self, timeout: float) -> bool:
+        deadline = asyncio.get_running_loop().time() + timeout
+        while asyncio.get_running_loop().time() < deadline:
+            if (await self.state.snapshot()).physical.k1:
+                return True
+            await asyncio.sleep(0.05)
+        return False
+
+    def _record_recovery_failed(self, result: CommandResult) -> None:
+        self.safety.record(
+            EventCode.CUSTOM_M113_RECOVERY_FAILED,
+            Severity.WARNING,
+            "command_service",
+            {"code": result.code, "message": result.message},
+        )
 
     def _machine_block(self, snapshot, allow_fault: bool = False) -> CommandResult | None:
         if snapshot.lightburn.stream_active:

@@ -1,10 +1,15 @@
 import asyncio
+from pathlib import Path
 
 import backend.grbl_proxy as grbl_proxy_module
+from backend.command_service import ControllerCommandService
 from backend.gpio import MockGPIOBackend
 from backend.grbl_proxy import REALTIME_PAUSE, REALTIME_RESUME, REALTIME_STOP, GrblProxy, MockSerialEndpoint
-from backend.safety import SafetyController
+from backend.mode_manager import ModeManager
+from backend.network_manager import NetworkManager
+from backend.safety import EstopSource, SafetyController
 from backend.state import ControllerState, MachineState
+from backend.virtualhere import VirtualHereService
 
 
 async def _proxy(port: int = 0):
@@ -16,6 +21,30 @@ async def _proxy(port: int = 0):
     proxy = GrblProxy(state, safety, host="127.0.0.1", port=port, status_poll_interval=60)
     await proxy.start()
     return state, safety, proxy
+
+
+async def _command_proxy(tmp_path: Path, port: int = 0):
+    state = ControllerState()
+    gpio = MockGPIOBackend(power_sense=True)
+    safety = SafetyController(state, gpio)
+    await safety.initialize_safe()
+    await safety.refresh_physical_inputs()
+    proxy = GrblProxy(state, safety, host="127.0.0.1", port=port, status_poll_interval=60)
+    virtualhere = VirtualHereService()
+    manager = ModeManager(state, proxy, virtualhere, tmp_path / "mode.json")
+    commands = ControllerCommandService(state, safety, proxy, manager, NetworkManager(dry_run=True))
+    commands.recovery_connect_timeout_seconds = 0.3
+    commands.recovery_home_timeout_seconds = 0.3
+    proxy.set_custom_command_handler(commands)
+    await proxy.start()
+    return state, gpio, safety, proxy, commands
+
+
+async def _open_proxy_client(proxy: GrblProxy):
+    assert proxy.server is not None
+    sock = proxy.server.sockets[0]
+    host, port = sock.getsockname()[:2]
+    return await asyncio.open_connection(host, port)
 
 
 async def test_pause_resume_stop_inject_realtime_bytes():
@@ -215,6 +244,169 @@ async def test_usb_loss_stops_proxy_and_uses_single_recovery_task():
         await proxy.stop()
 
 
+async def test_m112_is_intercepted_and_triggers_estop(tmp_path: Path):
+    state, gpio, safety, proxy, _ = await _command_proxy(tmp_path)
+    try:
+        assert isinstance(proxy.serial, MockSerialEndpoint)
+        reader, writer = await _open_proxy_client(proxy)
+
+        writer.write(b"M112\n")
+        await writer.drain()
+
+        assert await _read_until_custom_response(reader) == b"ok\r\n"
+        assert b"M112\n" not in proxy.serial.written
+        snapshot = await state.snapshot()
+        assert snapshot.safety.software_estop is True
+        assert snapshot.machine.state == MachineState.FAULT
+        assert snapshot.machine.homed is False
+        assert snapshot.physical.k1 is False
+        assert gpio.k1 is False
+        assert any(event.code.name == "CUSTOM_M112_ESTOP" for event in safety.events)
+
+        writer.close()
+        await writer.wait_closed()
+    finally:
+        await proxy.stop()
+
+
+async def test_m113_is_blocked_while_physical_estop_is_active(tmp_path: Path):
+    state, gpio, _, proxy, _ = await _command_proxy(tmp_path)
+    try:
+        assert isinstance(proxy.serial, MockSerialEndpoint)
+        gpio.estop_sense = True
+        await proxy.safety.refresh_physical_inputs()
+        reader, writer = await _open_proxy_client(proxy)
+
+        writer.write(b"M113\n")
+        await writer.drain()
+
+        assert await reader.readline() == b"error:112\r\n"
+        assert b"M113\n" not in proxy.serial.written
+        assert b"$H\n" not in proxy.serial.written
+        snapshot = await state.snapshot()
+        assert snapshot.physical.estop_sense is True
+        assert snapshot.machine.homed is False
+
+        writer.close()
+        await writer.wait_closed()
+    finally:
+        await proxy.stop()
+
+
+async def test_m113_recovers_restores_k1_homes_and_acks_after_idle(tmp_path: Path):
+    state, gpio, _, proxy, _ = await _command_proxy(tmp_path)
+    try:
+        assert isinstance(proxy.serial, MockSerialEndpoint)
+        await proxy.safety.request_estop(EstopSource.WEB, "test fault")
+        reader, writer = await _open_proxy_client(proxy)
+
+        writer.write(b"M113\n")
+        await writer.drain()
+        await _wait_for(lambda: b"$H\n" in proxy.serial.written)
+        assert gpio.k1 is True
+        assert (await state.snapshot()).physical.k1 is True
+
+        await proxy.serial.inject_rx(b"<Home|FS:0,0>\n")
+        await proxy.serial.inject_rx(b"<Idle|FS:0,0>\n")
+
+        assert await _read_until_custom_response(reader) == b"ok\r\n"
+        assert b"M113\n" not in proxy.serial.written
+        snapshot = await state.snapshot()
+        assert snapshot.safety.software_estop is False
+        assert snapshot.machine.homed is True
+        assert snapshot.machine.state == MachineState.IDLE
+        assert snapshot.lightburn.stream_active is False
+
+        writer.close()
+        await writer.wait_closed()
+    finally:
+        await proxy.stop()
+
+
+async def test_m113_reports_failure_if_homing_times_out(tmp_path: Path):
+    state, _, _, proxy, _ = await _command_proxy(tmp_path)
+    try:
+        assert isinstance(proxy.serial, MockSerialEndpoint)
+        await proxy.safety.request_estop(EstopSource.WEB, "test fault")
+        reader, writer = await _open_proxy_client(proxy)
+
+        writer.write(b"M113\n")
+        await writer.drain()
+
+        assert await reader.readline() == b"error:113\r\n"
+        snapshot = await state.snapshot()
+        assert snapshot.machine.homed is False
+        assert snapshot.machine.state == MachineState.RECOVERING
+
+        writer.close()
+        await writer.wait_closed()
+    finally:
+        await proxy.stop()
+
+
+async def test_m113_waits_for_grbl_reconnect_before_homing(tmp_path: Path):
+    state, _, _, proxy, commands = await _command_proxy(tmp_path)
+    try:
+        await proxy.stop()
+        await state.update(lambda snapshot: setattr(snapshot.lightburn, "stream_active", False))
+        await proxy.safety.request_estop(EstopSource.WEB, "test fault")
+
+        recover_task = asyncio.create_task(commands.recover_to_ready())
+        await _wait_for(lambda: proxy.serial is not None and b"$H\n" in proxy.serial.written)
+        assert proxy.active is True
+        assert isinstance(proxy.serial, MockSerialEndpoint)
+        await proxy.serial.inject_rx(b"<Home|FS:0,0>\n<Idle|FS:0,0>\n")
+
+        result = await recover_task
+        assert result.ok is True
+        assert (await state.snapshot()).machine.homed is True
+    finally:
+        await proxy.stop()
+
+
+async def test_fragmented_m112_and_multiple_lines_are_intercepted(tmp_path: Path):
+    state, _, _, proxy, _ = await _command_proxy(tmp_path)
+    try:
+        assert isinstance(proxy.serial, MockSerialEndpoint)
+        reader, writer = await _open_proxy_client(proxy)
+
+        writer.write(b"G0 X1\nM1")
+        await writer.drain()
+        writer.write(b"12\n")
+        await writer.drain()
+
+        assert await reader.readline() == b"ok\r\n"
+        await _wait_for(lambda: b"G0 X1\n" in proxy.serial.written)
+        assert b"M112\n" not in proxy.serial.written
+        assert (await state.snapshot()).machine.state == MachineState.FAULT
+
+        writer.close()
+        await writer.wait_closed()
+    finally:
+        await proxy.stop()
+
+
+async def test_normal_gcode_crlf_m1120_comments_and_realtime_forward(tmp_path: Path):
+    state, _, _, proxy, _ = await _command_proxy(tmp_path)
+    try:
+        assert isinstance(proxy.serial, MockSerialEndpoint)
+        _, writer = await _open_proxy_client(proxy)
+
+        writer.write(b"G1 X1\r\nM1120\n(contains M112)\n!\n")
+        await writer.drain()
+        await _wait_for(lambda: REALTIME_PAUSE in proxy.serial.written)
+
+        assert b"G1 X1\r\n" in proxy.serial.written
+        assert b"M1120\n" in proxy.serial.written
+        assert b"(contains M112)\n" in proxy.serial.written
+        assert (await state.snapshot()).machine.state != MachineState.FAULT
+
+        writer.close()
+        await writer.wait_closed()
+    finally:
+        await proxy.stop()
+
+
 async def _wait_for(predicate, timeout: float = 1.0):
     deadline = asyncio.get_running_loop().time() + timeout
     while asyncio.get_running_loop().time() < deadline:
@@ -222,6 +414,15 @@ async def _wait_for(predicate, timeout: float = 1.0):
             return
         await asyncio.sleep(0.01)
     raise AssertionError("condition was not met")
+
+
+async def _read_until_custom_response(reader: asyncio.StreamReader, timeout: float = 1.0) -> bytes:
+    deadline = asyncio.get_running_loop().time() + timeout
+    while asyncio.get_running_loop().time() < deadline:
+        line = await asyncio.wait_for(reader.readline(), timeout=deadline - asyncio.get_running_loop().time())
+        if line.startswith((b"ok", b"error:")):
+            return line
+    raise AssertionError("custom command response was not received")
 
 
 async def _wait_for_stream_active(state: ControllerState, timeout: float = 1.0) -> None:

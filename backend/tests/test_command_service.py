@@ -1,3 +1,4 @@
+import asyncio
 from pathlib import Path
 
 from backend.command_service import ControllerCommandService
@@ -22,6 +23,9 @@ async def _service(tmp_path: Path):
     virtualhere = VirtualHereService()
     manager = ModeManager(state, proxy, virtualhere, tmp_path / "mode.json")
     commands = ControllerCommandService(state, safety, proxy, manager, NetworkManager(dry_run=True))
+    commands.recovery_connect_timeout_seconds = 0.3
+    commands.recovery_home_timeout_seconds = 0.3
+    proxy.set_custom_command_handler(commands)
     return state, gpio, proxy, commands
 
 
@@ -51,17 +55,31 @@ async def test_estop_is_always_routed_to_safety(tmp_path: Path):
         await proxy.stop()
 
 
-async def test_reset_fault_routes_through_safety_without_homing(tmp_path: Path):
+async def test_reset_fault_recovers_through_safety_and_homing(tmp_path: Path):
     state, _, proxy, commands = await _service(tmp_path)
     try:
         await commands.estop(EstopSource.WEB)
-        result = await commands.reset_fault()
+        result_task = asyncio.create_task(commands.reset_fault())
+        await _wait_for(lambda: b"$H\n" in proxy.serial.written)
+        await proxy.handle_serial_line("<Home|FS:0,0>")
+        await proxy.handle_serial_line("<Idle|FS:0,0>")
+        result = await result_task
         assert result.ok is True
         snapshot = await state.snapshot()
         assert snapshot.safety.software_estop is False
-        assert snapshot.machine.homed is False
+        assert snapshot.machine.homed is True
+        assert snapshot.machine.state == MachineState.IDLE
     finally:
         await proxy.stop()
+
+
+async def _wait_for(predicate, timeout: float = 1.0):
+    deadline = asyncio.get_running_loop().time() + timeout
+    while asyncio.get_running_loop().time() < deadline:
+        if predicate():
+            return
+        await asyncio.sleep(0.01)
+    raise AssertionError("condition was not met")
 
 
 async def test_mode_change_rejects_fault(tmp_path: Path):

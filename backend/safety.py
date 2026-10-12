@@ -84,6 +84,7 @@ class SafetyController:
                 snapshot.safety.fire_active = True
             snapshot.machine.homed = False
             snapshot.machine.state = MachineState.FAULT
+            snapshot.lightburn.stream_active = False
 
         await self.state.update(mutate)
         await self.set_k1(False)

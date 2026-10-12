@@ -69,7 +69,7 @@ class LocalControllerAPI:
         return await self._result(self.commands.estop(EstopSource.LOCAL_UI, "local touchscreen requested E-stop"))
 
     async def _reset_fault(self, _: web.Request) -> web.Response:
-        return await self._result(self.commands.reset_fault())
+        return await self._result(self.commands.recover_to_ready())
 
     async def _network_scan(self, _: web.Request) -> web.Response:
         return await self._result(self.commands.network_scan())

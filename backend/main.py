@@ -78,6 +78,7 @@ async def run(config_path: Path | None, mock: bool) -> None:
     )
     diagnostics = DiagnosticsProvider(config, state, gpio, network, camera, virtualhere)
     commands = ControllerCommandService(state, safety, proxy, mode_manager, network, event_sink=event_logger)
+    proxy.set_custom_command_handler(commands)
     local_api = LocalControllerAPI(state, commands)
     restored_mode = await mode_manager.restore(LaserMode(config.laser.mode))
     web_host = _resolve_web_host(config, allow_unset_tailscale=mock)

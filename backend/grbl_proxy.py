@@ -16,7 +16,14 @@ REALTIME_PAUSE = b"!"
 REALTIME_RESUME = b"~"
 REALTIME_STOP = b"\x18"
 STATUS_QUERY = b"?"
+REALTIME_BYTES = {REALTIME_PAUSE[0], REALTIME_RESUME[0], REALTIME_STOP[0], STATUS_QUERY[0]}
 JOB_TRAFFIC_PATTERN = re.compile(rb"(^|\s)(G0|G00|G1|G01|G2|G02|G3|G03|M3|M03|M4|M04)\b", re.IGNORECASE)
+CUSTOM_COMMAND_ERRORS = {
+    "CUSTOM_HANDLER_UNAVAILABLE": 110,
+    "CUSTOM_ESTOP_FAILED": 111,
+    "CUSTOM_RECOVERY_BLOCKED": 112,
+    "CUSTOM_RECOVERY_FAILED": 113,
+}
 
 
 class MockSerialEndpoint:
@@ -45,6 +52,11 @@ class SerialEndpoint(Protocol):
     async def close(self) -> None: ...
 
 
+class CustomCommandHandler(Protocol):
+    async def custom_m112_estop(self) -> object: ...
+    async def recover_to_ready(self) -> object: ...
+
+
 class GrblProxy:
     def __init__(
         self,
@@ -54,6 +66,7 @@ class GrblProxy:
         port: int = 23,
         serial_factory: Callable[[], Awaitable[SerialEndpoint]] | None = None,
         status_poll_interval: float = 0.25,
+        custom_command_handler: CustomCommandHandler | None = None,
     ) -> None:
         self.state = state
         self.safety = safety
@@ -61,6 +74,7 @@ class GrblProxy:
         self.port = port
         self.status_poll_interval = status_poll_interval
         self.serial_factory = serial_factory or self._default_serial_factory
+        self.custom_command_handler = custom_command_handler
         self.serial: SerialEndpoint | None = None
         self.server: asyncio.AbstractServer | None = None
         self.active = False
@@ -71,6 +85,9 @@ class GrblProxy:
         self._client_writer: asyncio.StreamWriter | None = None
         self._homing_requested = False
         self._homing_in_progress = False
+
+    def set_custom_command_handler(self, handler: CustomCommandHandler) -> None:
+        self.custom_command_handler = handler
 
     async def start(self) -> None:
         if self.active:
@@ -161,6 +178,31 @@ class GrblProxy:
     async def inject_realtime(self, command: bytes) -> None:
         await self._write_serial(command)
 
+    async def ensure_connected(self, timeout: float = 10.0) -> bool:
+        deadline = asyncio.get_running_loop().time() + timeout
+        while asyncio.get_running_loop().time() < deadline:
+            snapshot = await self.state.snapshot()
+            if self.active and self.serial and snapshot.machine.connected_to_grbl:
+                return True
+            if snapshot.physical.k1 and not self.active:
+                try:
+                    await self.start()
+                except Exception as exc:
+                    LOGGER.warning("laser proxy reconnect waiting for USB: %s", exc)
+            await asyncio.sleep(0.1)
+        return False
+
+    async def wait_for_homing_complete(self, timeout: float = 30.0) -> bool:
+        deadline = asyncio.get_running_loop().time() + timeout
+        while asyncio.get_running_loop().time() < deadline:
+            snapshot = await self.state.snapshot()
+            if snapshot.machine.homed and snapshot.machine.state == MachineState.IDLE:
+                return True
+            if snapshot.machine.state in {MachineState.ALARM, MachineState.FAULT}:
+                return False
+            await asyncio.sleep(0.05)
+        return False
+
     async def _write_serial(self, data: bytes) -> None:
         if not self.serial:
             raise RuntimeError("GRBL serial is not connected")
@@ -181,21 +223,15 @@ class GrblProxy:
 
         await self.state.update(connected)
         self.safety.record(EventCode.LIGHTBURN_CONNECTED, Severity.INFO, "grbl_proxy")
+        pending_line = b""
         try:
             while not reader.at_eof():
                 data = await reader.read(4096)
                 if not data:
                     break
-                await self._write_serial(data)
-                if self._is_meaningful_job_traffic(data):
-                    before_stream = (await self.state.snapshot()).lightburn.stream_active
-
-                    def mark_stream(snapshot):
-                        snapshot.lightburn.stream_active = True
-
-                    await self.state.update(mark_stream)
-                    if not before_stream:
-                        self.safety.record(EventCode.LIGHTBURN_STREAM_STARTED, Severity.INFO, "grbl_proxy")
+                pending_line = await self._process_client_data(data, pending_line, writer)
+            if pending_line:
+                await self._forward_client_line(pending_line, pending_line)
         finally:
             self._client_connected = False
             if self._client_writer is writer:
@@ -204,6 +240,82 @@ class GrblProxy:
             writer.close()
             await writer.wait_closed()
             await self.safety.handle_lightburn_disconnect()
+
+    async def _process_client_data(self, data: bytes, pending_line: bytes, writer: asyncio.StreamWriter) -> bytes:
+        for byte in data:
+            if byte in REALTIME_BYTES:
+                if pending_line:
+                    await self._flush_complete_client_lines(pending_line)
+                    pending_line = b""
+                await self._write_serial(bytes([byte]))
+                continue
+            pending_line += bytes([byte])
+            if byte == 0x0A:
+                await self._handle_complete_client_line(pending_line, writer)
+                pending_line = b""
+        return pending_line
+
+    async def _flush_complete_client_lines(self, data: bytes) -> None:
+        await self._write_serial(data)
+        await self._mark_stream_if_job_traffic(data)
+
+    async def _handle_complete_client_line(self, line: bytes, writer: asyncio.StreamWriter) -> None:
+        command = line.strip().upper()
+        if command == b"M112":
+            await self._handle_custom_m112(writer)
+            return
+        if command == b"M113":
+            await self._handle_custom_m113(writer)
+            return
+        await self._forward_client_line(line, line)
+
+    async def _forward_client_line(self, wire_line: bytes, traffic_line: bytes) -> None:
+        await self._write_serial(wire_line)
+        await self._mark_stream_if_job_traffic(traffic_line)
+
+    async def _mark_stream_if_job_traffic(self, data: bytes) -> None:
+        if not self._is_meaningful_job_traffic(data):
+            return
+        before_stream = (await self.state.snapshot()).lightburn.stream_active
+
+        def mark_stream(snapshot):
+            snapshot.lightburn.stream_active = True
+
+        await self.state.update(mark_stream)
+        if not before_stream:
+            self.safety.record(EventCode.LIGHTBURN_STREAM_STARTED, Severity.INFO, "grbl_proxy")
+
+    async def _handle_custom_m112(self, writer: asyncio.StreamWriter) -> None:
+        if not self.custom_command_handler:
+            await self._write_client_custom_error(writer, "CUSTOM_HANDLER_UNAVAILABLE")
+            return
+        result = await self.custom_command_handler.custom_m112_estop()
+        if bool(getattr(result, "ok", False)):
+            await self._write_client_custom_ok(writer)
+        else:
+            await self._write_client_custom_error(writer, "CUSTOM_ESTOP_FAILED")
+
+    async def _handle_custom_m113(self, writer: asyncio.StreamWriter) -> None:
+        if not self.custom_command_handler:
+            await self._write_client_custom_error(writer, "CUSTOM_HANDLER_UNAVAILABLE")
+            return
+        result = await self.custom_command_handler.recover_to_ready()
+        if bool(getattr(result, "ok", False)):
+            await self._write_client_custom_ok(writer)
+            return
+        status = str(getattr(getattr(result, "status", ""), "value", getattr(result, "status", "")))
+        await self._write_client_custom_error(
+            writer,
+            "CUSTOM_RECOVERY_BLOCKED" if status == "blocked" else "CUSTOM_RECOVERY_FAILED",
+        )
+
+    async def _write_client_custom_ok(self, writer: asyncio.StreamWriter) -> None:
+        writer.write(b"ok\r\n")
+        await writer.drain()
+
+    async def _write_client_custom_error(self, writer: asyncio.StreamWriter, code: str) -> None:
+        writer.write(f"error:{CUSTOM_COMMAND_ERRORS[code]}\r\n".encode())
+        await writer.drain()
 
     async def handle_serial_line(self, line: str) -> None:
         status = parse_status_line(line)

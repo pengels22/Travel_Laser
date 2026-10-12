@@ -79,5 +79,5 @@ class WebPortal:
     async def _reset_fault(self, _: web.Request) -> web.Response:
         if not self.commands:
             return web.json_response({"ok": False, "message": "command service unavailable"}, status=503)
-        result = await self.commands.reset_fault()
+        result = await self.commands.recover_to_ready()
         return web.json_response(result.as_dict(), status=200 if result.ok else 409)
