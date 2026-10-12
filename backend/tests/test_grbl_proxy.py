@@ -12,24 +12,24 @@ from backend.state import ControllerState, MachineState
 from backend.virtualhere import VirtualHereService
 
 
-async def _proxy(port: int = 0):
+async def _proxy(port: int = 0, serial_factory=None):
     state = ControllerState()
     gpio = MockGPIOBackend(power_sense=True)
     safety = SafetyController(state, gpio)
     await safety.initialize_safe()
     await safety.refresh_physical_inputs()
-    proxy = GrblProxy(state, safety, host="127.0.0.1", port=port, status_poll_interval=60)
+    proxy = GrblProxy(state, safety, host="127.0.0.1", port=port, status_poll_interval=60, serial_factory=serial_factory)
     await proxy.start()
     return state, safety, proxy
 
 
-async def _command_proxy(tmp_path: Path, port: int = 0):
+async def _command_proxy(tmp_path: Path, port: int = 0, serial_factory=None):
     state = ControllerState()
     gpio = MockGPIOBackend(power_sense=True)
     safety = SafetyController(state, gpio)
     await safety.initialize_safe()
     await safety.refresh_physical_inputs()
-    proxy = GrblProxy(state, safety, host="127.0.0.1", port=port, status_poll_interval=60)
+    proxy = GrblProxy(state, safety, host="127.0.0.1", port=port, status_poll_interval=60, serial_factory=serial_factory)
     virtualhere = VirtualHereService()
     manager = ModeManager(state, proxy, virtualhere, tmp_path / "mode.json")
     commands = ControllerCommandService(state, safety, proxy, manager, NetworkManager(dry_run=True))
@@ -233,7 +233,9 @@ async def test_usb_loss_stops_proxy_and_uses_single_recovery_task():
     try:
         assert isinstance(proxy.serial, MockSerialEndpoint)
         await proxy.serial.inject_rx(b"")
-        await _wait_for(lambda: not proxy.active)
+        await _wait_for(lambda: proxy.serial is None)
+        assert proxy.active is True
+        assert proxy.server is not None
         snapshot = await state.snapshot()
         assert snapshot.machine.laser_usb_connected is False
         assert snapshot.machine.connected_to_grbl is False
@@ -347,9 +349,10 @@ async def test_m113_reports_failure_if_homing_times_out(tmp_path: Path):
 async def test_m113_waits_for_grbl_reconnect_before_homing(tmp_path: Path):
     state, _, _, proxy, commands = await _command_proxy(tmp_path)
     try:
-        await proxy.stop()
-        await state.update(lambda snapshot: setattr(snapshot.lightburn, "stream_active", False))
         await proxy.safety.request_estop(EstopSource.WEB, "test fault")
+        assert isinstance(proxy.serial, MockSerialEndpoint)
+        await proxy.serial.inject_rx(b"")
+        await _wait_for(lambda: proxy.serial is None)
 
         recover_task = asyncio.create_task(commands.recover_to_ready())
         await _wait_for(lambda: proxy.serial is not None and b"$H\n" in proxy.serial.written)
@@ -403,6 +406,176 @@ async def test_normal_gcode_crlf_m1120_comments_and_realtime_forward(tmp_path: P
 
         writer.close()
         await writer.wait_closed()
+    finally:
+        await proxy.stop()
+
+
+async def test_m112_serial_loss_leaves_listener_and_existing_connection_can_recover(tmp_path: Path):
+    state, gpio, _, proxy, _ = await _command_proxy(tmp_path)
+    try:
+        assert isinstance(proxy.serial, MockSerialEndpoint)
+        old_serial = proxy.serial
+        reader, writer = await _open_proxy_client(proxy)
+
+        writer.write(b"M112\n")
+        await writer.drain()
+        assert await _read_until_custom_response(reader) == b"ok\r\n"
+        await old_serial.inject_rx(b"")
+        await _wait_for(lambda: proxy.serial is None)
+
+        snapshot = await state.snapshot()
+        assert proxy.active is True
+        assert proxy.server is not None
+        assert snapshot.lightburn.connected is True
+        assert snapshot.machine.connected_to_grbl is False
+
+        writer.write(b"M113\n")
+        await writer.drain()
+        await _wait_for(lambda: proxy.serial is not None and b"$H\n" in proxy.serial.written)
+        assert gpio.k1 is True
+        assert isinstance(proxy.serial, MockSerialEndpoint)
+        await proxy.serial.inject_rx(b"<Home|FS:0,0>\n<Idle|FS:0,0>\n")
+        assert await _read_until_custom_response(reader) == b"ok\r\n"
+
+        snapshot = await state.snapshot()
+        assert snapshot.machine.connected_to_grbl is True
+        assert snapshot.machine.homed is True
+        assert snapshot.machine.state == MachineState.IDLE
+
+        writer.close()
+        await writer.wait_closed()
+    finally:
+        await proxy.stop()
+
+
+async def test_new_connection_can_recover_while_grbl_absent_and_faulted(tmp_path: Path):
+    state, gpio, _, proxy, _ = await _command_proxy(tmp_path)
+    try:
+        assert isinstance(proxy.serial, MockSerialEndpoint)
+        old_serial = proxy.serial
+        reader, writer = await _open_proxy_client(proxy)
+        writer.write(b"M112\n")
+        await writer.drain()
+        assert await _read_until_custom_response(reader) == b"ok\r\n"
+        await old_serial.inject_rx(b"")
+        await _wait_for(lambda: proxy.serial is None)
+
+        writer.close()
+        await writer.wait_closed()
+        await _wait_for(lambda: not proxy._client_connected)
+
+        reader2, writer2 = await _open_proxy_client(proxy)
+        snapshot = await state.snapshot()
+        assert snapshot.lightburn.connected is True
+        assert snapshot.machine.connected_to_grbl is False
+        assert snapshot.machine.state == MachineState.FAULT
+
+        writer2.write(b"M113\n")
+        await writer2.drain()
+        await _wait_for(lambda: proxy.serial is not None and b"$H\n" in proxy.serial.written)
+        assert gpio.k1 is True
+        assert isinstance(proxy.serial, MockSerialEndpoint)
+        await proxy.serial.inject_rx(b"<Home|FS:0,0>\n<Idle|FS:0,0>\n")
+        assert await _read_until_custom_response(reader2) == b"ok\r\n"
+
+        snapshot = await state.snapshot()
+        assert snapshot.machine.connected_to_grbl is True
+        assert snapshot.machine.homed is True
+        assert snapshot.machine.state == MachineState.IDLE
+
+        writer2.close()
+        await writer2.wait_closed()
+    finally:
+        await proxy.stop()
+
+
+async def test_m112_and_motion_in_same_read_does_not_forward_motion(tmp_path: Path):
+    _, _, _, proxy, _ = await _command_proxy(tmp_path)
+    try:
+        assert isinstance(proxy.serial, MockSerialEndpoint)
+        reader, writer = await _open_proxy_client(proxy)
+
+        writer.write(b"M112\nG1 X100\n")
+        await writer.drain()
+
+        assert await _read_until_custom_response(reader) == b"ok\r\n"
+        assert await _read_until_custom_response(reader) == b"error:121\r\n"
+        assert b"G1 X100\n" not in proxy.serial.written
+
+        writer.close()
+        await writer.wait_closed()
+    finally:
+        await proxy.stop()
+
+
+async def test_gcode_after_m112_before_usb_disappears_is_rejected(tmp_path: Path):
+    _, _, _, proxy, _ = await _command_proxy(tmp_path)
+    try:
+        assert isinstance(proxy.serial, MockSerialEndpoint)
+        reader, writer = await _open_proxy_client(proxy)
+
+        writer.write(b"M112\n")
+        await writer.drain()
+        assert await _read_until_custom_response(reader) == b"ok\r\n"
+        writer.write(b"G1 X10\n")
+        await writer.drain()
+
+        assert await _read_until_custom_response(reader) == b"error:121\r\n"
+        assert b"G1 X10\n" not in proxy.serial.written
+
+        writer.close()
+        await writer.wait_closed()
+    finally:
+        await proxy.stop()
+
+
+async def test_gcode_during_recovering_is_rejected(tmp_path: Path):
+    state, _, _, proxy, _ = await _command_proxy(tmp_path)
+    try:
+        assert isinstance(proxy.serial, MockSerialEndpoint)
+        await state.update(lambda snapshot: setattr(snapshot.machine, "state", MachineState.RECOVERING))
+        reader, writer = await _open_proxy_client(proxy)
+
+        writer.write(b"G1 X5\n")
+        await writer.drain()
+
+        assert await _read_until_custom_response(reader) == b"error:121\r\n"
+        assert b"G1 X5\n" not in proxy.serial.written
+
+        writer.close()
+        await writer.wait_closed()
+    finally:
+        await proxy.stop()
+
+
+async def test_successful_m113_does_not_resume_invalidated_session_but_new_session_can_cut(tmp_path: Path):
+    _, _, _, proxy, _ = await _command_proxy(tmp_path)
+    try:
+        assert isinstance(proxy.serial, MockSerialEndpoint)
+        reader, writer = await _open_proxy_client(proxy)
+
+        writer.write(b"M112\n")
+        await writer.drain()
+        assert await _read_until_custom_response(reader) == b"ok\r\n"
+        writer.write(b"M113\nG1 X20\n")
+        await writer.drain()
+        await _wait_for(lambda: b"$H\n" in proxy.serial.written)
+        await proxy.serial.inject_rx(b"<Home|FS:0,0>\n<Idle|FS:0,0>\n")
+        assert await _read_until_custom_response(reader) == b"ok\r\n"
+        assert await _read_until_custom_response(reader) == b"error:121\r\n"
+        assert b"G1 X20\n" not in proxy.serial.written
+
+        writer.close()
+        await writer.wait_closed()
+        await _wait_for(lambda: not proxy._client_connected)
+
+        _, writer2 = await _open_proxy_client(proxy)
+        writer2.write(b"G1 X30\n")
+        await writer2.drain()
+        await _wait_for(lambda: b"G1 X30\n" in proxy.serial.written)
+
+        writer2.close()
+        await writer2.wait_closed()
     finally:
         await proxy.stop()
 

@@ -23,6 +23,7 @@ CUSTOM_COMMAND_ERRORS = {
     "CUSTOM_ESTOP_FAILED": 111,
     "CUSTOM_RECOVERY_BLOCKED": 112,
     "CUSTOM_RECOVERY_FAILED": 113,
+    "GCODE_BLOCKED": 121,
 }
 
 
@@ -91,20 +92,34 @@ class GrblProxy:
 
     async def start(self) -> None:
         if self.active:
+            await self._ensure_serial_started()
             return
-        self.serial = await self.serial_factory()
         self.server = await asyncio.start_server(self._handle_client, self.host, self.port)
         self.active = True
+        await self._ensure_serial_started()
 
+    async def _ensure_serial_started(self) -> bool:
+        if self.serial:
+            return True
+        try:
+            self.serial = await self.serial_factory()
+        except Exception as exc:
+            LOGGER.warning("laser proxy serial waiting for USB: %s", exc)
+            await self._mark_grbl_disconnected()
+            if not self._recovery_task or self._recovery_task.done():
+                self._recovery_task = asyncio.create_task(self._recover_when_safe())
+            return False
         def mutate(snapshot):
             snapshot.machine.laser_usb_connected = True
             snapshot.machine.connected_to_grbl = True
-            snapshot.machine.state = MachineState.IDLE
+            if snapshot.machine.state == MachineState.OFFLINE:
+                snapshot.machine.state = MachineState.IDLE
 
         await self.state.update(mutate)
         self.safety.record(EventCode.LASER_USB_CONNECTED, Severity.INFO, "grbl_proxy")
         self._poll_task = asyncio.create_task(self._status_poll_loop())
         self._serial_read_task = asyncio.create_task(self._serial_read_loop())
+        return True
 
     async def stop(self) -> None:
         if self._recovery_task and self._recovery_task is not asyncio.current_task():
@@ -182,13 +197,10 @@ class GrblProxy:
         deadline = asyncio.get_running_loop().time() + timeout
         while asyncio.get_running_loop().time() < deadline:
             snapshot = await self.state.snapshot()
-            if self.active and self.serial and snapshot.machine.connected_to_grbl:
+            if self.serial and snapshot.machine.connected_to_grbl:
                 return True
-            if snapshot.physical.k1 and not self.active:
-                try:
-                    await self.start()
-                except Exception as exc:
-                    LOGGER.warning("laser proxy reconnect waiting for USB: %s", exc)
+            if snapshot.physical.k1:
+                await self._ensure_serial_started()
             await asyncio.sleep(0.1)
         return False
 
@@ -224,14 +236,15 @@ class GrblProxy:
         await self.state.update(connected)
         self.safety.record(EventCode.LIGHTBURN_CONNECTED, Severity.INFO, "grbl_proxy")
         pending_line = b""
+        job_invalidated = False
         try:
             while not reader.at_eof():
                 data = await reader.read(4096)
                 if not data:
                     break
-                pending_line = await self._process_client_data(data, pending_line, writer)
+                pending_line, job_invalidated = await self._process_client_data(data, pending_line, writer, job_invalidated)
             if pending_line:
-                await self._forward_client_line(pending_line, pending_line)
+                await self._handle_complete_client_line(pending_line, writer, job_invalidated)
         finally:
             self._client_connected = False
             if self._client_writer is writer:
@@ -241,37 +254,63 @@ class GrblProxy:
             await writer.wait_closed()
             await self.safety.handle_lightburn_disconnect()
 
-    async def _process_client_data(self, data: bytes, pending_line: bytes, writer: asyncio.StreamWriter) -> bytes:
+    async def _process_client_data(
+        self,
+        data: bytes,
+        pending_line: bytes,
+        writer: asyncio.StreamWriter,
+        job_invalidated: bool,
+    ) -> tuple[bytes, bool]:
         for byte in data:
             if byte in REALTIME_BYTES:
                 if pending_line:
-                    await self._flush_complete_client_lines(pending_line)
+                    job_invalidated = await self._handle_complete_client_line(pending_line, writer, job_invalidated)
                     pending_line = b""
-                await self._write_serial(bytes([byte]))
+                await self._forward_realtime_byte(bytes([byte]))
                 continue
             pending_line += bytes([byte])
             if byte == 0x0A:
-                await self._handle_complete_client_line(pending_line, writer)
+                job_invalidated = await self._handle_complete_client_line(pending_line, writer, job_invalidated)
                 pending_line = b""
-        return pending_line
+        return pending_line, job_invalidated
 
-    async def _flush_complete_client_lines(self, data: bytes) -> None:
-        await self._write_serial(data)
-        await self._mark_stream_if_job_traffic(data)
-
-    async def _handle_complete_client_line(self, line: bytes, writer: asyncio.StreamWriter) -> None:
+    async def _handle_complete_client_line(self, line: bytes, writer: asyncio.StreamWriter, job_invalidated: bool) -> bool:
         command = line.strip().upper()
         if command == b"M112":
             await self._handle_custom_m112(writer)
-            return
+            return True
         if command == b"M113":
             await self._handle_custom_m113(writer)
-            return
+            return job_invalidated
+        if not await self._normal_gcode_allowed(job_invalidated):
+            await self._write_client_custom_error(writer, "GCODE_BLOCKED")
+            return job_invalidated
         await self._forward_client_line(line, line)
+        return job_invalidated
+
+    async def _normal_gcode_allowed(self, job_invalidated: bool) -> bool:
+        snapshot = await self.state.snapshot()
+        return (
+            not job_invalidated
+            and self.serial is not None
+            and snapshot.machine.connected_to_grbl
+            and snapshot.machine.state not in {MachineState.FAULT, MachineState.RECOVERING}
+            and not snapshot.safety.software_estop
+            and not snapshot.safety.remote_estop
+            and not snapshot.physical.estop_sense
+        )
 
     async def _forward_client_line(self, wire_line: bytes, traffic_line: bytes) -> None:
         await self._write_serial(wire_line)
         await self._mark_stream_if_job_traffic(traffic_line)
+
+    async def _forward_realtime_byte(self, command: bytes) -> None:
+        if self.serial is None:
+            return
+        try:
+            await self._write_serial(command)
+        except RuntimeError:
+            return
 
     async def _mark_stream_if_job_traffic(self, data: bytes) -> None:
         if not self._is_meaningful_job_traffic(data):
@@ -406,7 +445,6 @@ class GrblProxy:
                 self._client_writer = None
 
     async def _handle_serial_loss(self) -> None:
-        self.active = False
         self._homing_requested = False
         self._homing_in_progress = False
         if self._poll_task and self._poll_task is not asyncio.current_task():
@@ -417,22 +455,11 @@ class GrblProxy:
             self._serial_read_task.cancel()
             await asyncio.gather(self._serial_read_task, return_exceptions=True)
             self._serial_read_task = None
-        if self.server:
-            self.server.close()
-            await self.server.wait_closed()
-            self.server = None
         if self.serial:
             await self.serial.close()
             self.serial = None
 
-        def mutate(snapshot):
-            snapshot.lightburn.connected = False
-            snapshot.lightburn.stream_active = False
-            snapshot.machine.laser_usb_connected = False
-            snapshot.machine.connected_to_grbl = False
-            snapshot.machine.homed = False
-
-        await self.state.update(mutate)
+        await self._mark_grbl_disconnected()
         await self.safety.handle_laser_usb_disconnected()
         if not self._recovery_task or self._recovery_task.done():
             self._recovery_task = asyncio.create_task(self._recover_when_safe())
@@ -447,14 +474,19 @@ class GrblProxy:
                 or snapshot.safety.software_estop
                 or (snapshot.safety.fire_enabled and snapshot.safety.fire_active)
             )
-            if not blocked and not self.active:
-                try:
-                    await self.start()
+            if not blocked and self.active and not self.serial:
+                if await self._ensure_serial_started():
                     self._recovery_task = None
                     return
-                except Exception as exc:
-                    LOGGER.warning("laser proxy reconnect waiting for USB: %s", exc)
             await asyncio.sleep(1.0)
+
+    async def _mark_grbl_disconnected(self) -> None:
+        def mutate(snapshot):
+            snapshot.machine.laser_usb_connected = False
+            snapshot.machine.connected_to_grbl = False
+            snapshot.machine.homed = False
+
+        await self.state.update(mutate)
 
     async def _default_serial_factory(self) -> MockSerialEndpoint:
         return MockSerialEndpoint()

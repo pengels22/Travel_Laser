@@ -19,7 +19,7 @@ from .network_manager import NetworkManager
 from .local_api import LocalControllerAPI
 from .safety import SafetyController
 from .serial_device import open_laser_serial
-from .state import ControllerState, LaserMode, MachineState
+from .state import ControllerState, LaserMode
 from .virtualhere import VirtualHereService
 from .web_portal import WebPortal
 
@@ -102,24 +102,8 @@ async def run(config_path: Path | None, mock: bool) -> None:
         await portal.start()
     else:
         LOGGER.warning("external web portal disabled because Tailscale address is unavailable")
-    proxy_recovery_task = None
     if restored_mode == LaserMode.NETWORK:
-        snapshot = await state.snapshot()
-        if snapshot.physical.k1:
-            try:
-                await proxy.start()
-            except Exception as exc:
-                LOGGER.error("laser proxy is waiting for USB: %s", exc)
-
-                def mark_laser_missing(current):
-                    current.machine.state = MachineState.FAULT
-                    current.machine.error = "LASER_NOT_FOUND"
-
-                await state.update(mark_laser_missing)
-                proxy_recovery_task = asyncio.create_task(_start_proxy_when_safe(state, proxy))
-        else:
-            LOGGER.warning("laser proxy held stopped because the safety relay is dropped")
-            proxy_recovery_task = asyncio.create_task(_start_proxy_when_safe(state, proxy))
+        await proxy.start()
     else:
         await virtualhere.start()
 
@@ -151,9 +135,6 @@ async def run(config_path: Path | None, mock: bool) -> None:
         if portal:
             await portal.stop()
         await local_api.stop()
-        if proxy_recovery_task:
-            proxy_recovery_task.cancel()
-            await asyncio.gather(proxy_recovery_task, return_exceptions=True)
         await proxy.stop()
         await virtualhere.stop()
         try:
@@ -250,17 +231,6 @@ async def _diagnostics_loop(diagnostics: DiagnosticsProvider) -> None:
         except Exception as exc:
             LOGGER.warning("diagnostics refresh failed: %s", exc)
         await asyncio.sleep(5.0)
-
-
-async def _start_proxy_when_safe(state: ControllerState, proxy: GrblProxy) -> None:
-    while True:
-        snapshot = await state.snapshot()
-        if snapshot.physical.k1 and not proxy.active:
-            try:
-                await proxy.start()
-            except Exception as exc:
-                LOGGER.warning("laser proxy startup waiting for USB: %s", exc)
-        await asyncio.sleep(1.0)
 
 
 def main() -> None:
