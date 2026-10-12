@@ -549,7 +549,7 @@ async def test_gcode_during_recovering_is_rejected(tmp_path: Path):
         await proxy.stop()
 
 
-async def test_successful_m113_does_not_resume_invalidated_session_but_new_session_can_cut(tmp_path: Path):
+async def test_successful_m113_blocks_buffered_gcode_then_same_session_can_cut(tmp_path: Path):
     _, _, _, proxy, _ = await _command_proxy(tmp_path)
     try:
         assert isinstance(proxy.serial, MockSerialEndpoint)
@@ -566,22 +566,17 @@ async def test_successful_m113_does_not_resume_invalidated_session_but_new_sessi
         assert await _read_until_custom_response(reader) == b"error:121\r\n"
         assert b"G1 X20\n" not in proxy.serial.written
 
-        writer.close()
-        await writer.wait_closed()
-        await _wait_for(lambda: not proxy._client_connected)
-
-        _, writer2 = await _open_proxy_client(proxy)
-        writer2.write(b"G1 X30\n")
-        await writer2.drain()
+        writer.write(b"G1 X30\n")
+        await writer.drain()
         await _wait_for(lambda: b"G1 X30\n" in proxy.serial.written)
 
-        writer2.close()
-        await writer2.wait_closed()
+        writer.close()
+        await writer.wait_closed()
     finally:
         await proxy.stop()
 
 
-async def test_m113_on_fresh_fault_session_requires_new_connection_for_gcode(tmp_path: Path):
+async def test_m113_on_fresh_fault_session_allows_later_same_connection_gcode(tmp_path: Path):
     _, _, _, proxy, _ = await _command_proxy(tmp_path)
     try:
         assert isinstance(proxy.serial, MockSerialEndpoint)
@@ -596,20 +591,10 @@ async def test_m113_on_fresh_fault_session_requires_new_connection_for_gcode(tmp
 
         writer.write(b"G1 X10\n")
         await writer.drain()
-        assert await _read_until_custom_response(reader) == b"error:121\r\n"
-        assert b"G1 X10\n" not in proxy.serial.written
+        await _wait_for(lambda: b"G1 X10\n" in proxy.serial.written)
 
         writer.close()
         await writer.wait_closed()
-        await _wait_for(lambda: not proxy._client_connected)
-
-        _, writer2 = await _open_proxy_client(proxy)
-        writer2.write(b"G1 X10\n")
-        await writer2.drain()
-        await _wait_for(lambda: b"G1 X10\n" in proxy.serial.written)
-
-        writer2.close()
-        await writer2.wait_closed()
     finally:
         await proxy.stop()
 
@@ -629,6 +614,10 @@ async def test_m113_and_gcode_same_read_on_fresh_fault_session_rejects_gcode(tmp
         assert await _read_until_custom_response(reader) == b"ok\r\n"
         assert await _read_until_custom_response(reader) == b"error:121\r\n"
         assert b"G1 X10\n" not in proxy.serial.written
+
+        writer.write(b"G1 X10\n")
+        await writer.drain()
+        await _wait_for(lambda: b"G1 X10\n" in proxy.serial.written)
 
         writer.close()
         await writer.wait_closed()

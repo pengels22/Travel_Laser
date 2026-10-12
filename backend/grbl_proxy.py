@@ -236,15 +236,20 @@ class GrblProxy:
         await self.state.update(connected)
         self.safety.record(EventCode.LIGHTBURN_CONNECTED, Severity.INFO, "grbl_proxy")
         pending_line = b""
-        job_invalidated = False
+        pending_line_blocked = False
         try:
             while not reader.at_eof():
                 data = await reader.read(4096)
                 if not data:
                     break
-                pending_line, job_invalidated = await self._process_client_data(data, pending_line, writer, job_invalidated)
+                pending_line, pending_line_blocked = await self._process_client_data(
+                    data,
+                    pending_line,
+                    writer,
+                    pending_line_blocked,
+                )
             if pending_line:
-                await self._handle_complete_client_line(pending_line, writer, job_invalidated)
+                await self._handle_complete_client_line(pending_line, writer, pending_line_blocked)
         finally:
             self._client_connected = False
             if self._client_writer is writer:
@@ -259,22 +264,36 @@ class GrblProxy:
         data: bytes,
         pending_line: bytes,
         writer: asyncio.StreamWriter,
-        job_invalidated: bool,
+        pending_line_blocked: bool,
     ) -> tuple[bytes, bool]:
+        line_blocked = pending_line_blocked
+        buffer_blocked = False
         for byte in data:
             if byte in REALTIME_BYTES:
                 if pending_line:
-                    job_invalidated = await self._handle_complete_client_line(pending_line, writer, job_invalidated)
+                    custom_boundary = await self._handle_complete_client_line(
+                        pending_line,
+                        writer,
+                        line_blocked or buffer_blocked,
+                    )
+                    buffer_blocked = buffer_blocked or custom_boundary
                     pending_line = b""
+                    line_blocked = False
                 await self._forward_realtime_byte(bytes([byte]))
                 continue
             pending_line += bytes([byte])
             if byte == 0x0A:
-                job_invalidated = await self._handle_complete_client_line(pending_line, writer, job_invalidated)
+                custom_boundary = await self._handle_complete_client_line(
+                    pending_line,
+                    writer,
+                    line_blocked or buffer_blocked,
+                )
+                buffer_blocked = buffer_blocked or custom_boundary
                 pending_line = b""
-        return pending_line, job_invalidated
+                line_blocked = False
+        return pending_line, bool(pending_line) and (line_blocked or buffer_blocked)
 
-    async def _handle_complete_client_line(self, line: bytes, writer: asyncio.StreamWriter, job_invalidated: bool) -> bool:
+    async def _handle_complete_client_line(self, line: bytes, writer: asyncio.StreamWriter, buffer_blocked: bool) -> bool:
         command = line.strip().upper()
         if command == b"M112":
             await self._handle_custom_m112(writer)
@@ -282,16 +301,16 @@ class GrblProxy:
         if command == b"M113":
             await self._handle_custom_m113(writer)
             return True
-        if not await self._normal_gcode_allowed(job_invalidated):
+        if not await self._normal_gcode_allowed(buffer_blocked):
             await self._write_client_custom_error(writer, "GCODE_BLOCKED")
-            return job_invalidated
+            return False
         await self._forward_client_line(line, line)
-        return job_invalidated
+        return False
 
-    async def _normal_gcode_allowed(self, job_invalidated: bool) -> bool:
+    async def _normal_gcode_allowed(self, buffer_blocked: bool) -> bool:
         snapshot = await self.state.snapshot()
         return (
-            not job_invalidated
+            not buffer_blocked
             and self.serial is not None
             and snapshot.machine.connected_to_grbl
             and snapshot.machine.state not in {MachineState.FAULT, MachineState.RECOVERING}
