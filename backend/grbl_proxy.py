@@ -281,7 +281,7 @@ class GrblProxy:
             return True
         if command == b"M113":
             await self._handle_custom_m113(writer)
-            return job_invalidated
+            return True
         if not await self._normal_gcode_allowed(job_invalidated):
             await self._write_client_custom_error(writer, "GCODE_BLOCKED")
             return job_invalidated

@@ -465,6 +465,7 @@ async def test_new_connection_can_recover_while_grbl_absent_and_faulted(tmp_path
         await _wait_for(lambda: not proxy._client_connected)
 
         reader2, writer2 = await _open_proxy_client(proxy)
+        await _wait_for_lightburn_connected(state)
         snapshot = await state.snapshot()
         assert snapshot.lightburn.connected is True
         assert snapshot.machine.connected_to_grbl is False
@@ -580,6 +581,61 @@ async def test_successful_m113_does_not_resume_invalidated_session_but_new_sessi
         await proxy.stop()
 
 
+async def test_m113_on_fresh_fault_session_requires_new_connection_for_gcode(tmp_path: Path):
+    _, _, _, proxy, _ = await _command_proxy(tmp_path)
+    try:
+        assert isinstance(proxy.serial, MockSerialEndpoint)
+        await proxy.safety.request_estop(EstopSource.WEB, "test fault")
+        reader, writer = await _open_proxy_client(proxy)
+
+        writer.write(b"M113\n")
+        await writer.drain()
+        await _wait_for(lambda: b"$H\n" in proxy.serial.written)
+        await proxy.serial.inject_rx(b"<Home|FS:0,0>\n<Idle|FS:0,0>\n")
+        assert await _read_until_custom_response(reader) == b"ok\r\n"
+
+        writer.write(b"G1 X10\n")
+        await writer.drain()
+        assert await _read_until_custom_response(reader) == b"error:121\r\n"
+        assert b"G1 X10\n" not in proxy.serial.written
+
+        writer.close()
+        await writer.wait_closed()
+        await _wait_for(lambda: not proxy._client_connected)
+
+        _, writer2 = await _open_proxy_client(proxy)
+        writer2.write(b"G1 X10\n")
+        await writer2.drain()
+        await _wait_for(lambda: b"G1 X10\n" in proxy.serial.written)
+
+        writer2.close()
+        await writer2.wait_closed()
+    finally:
+        await proxy.stop()
+
+
+async def test_m113_and_gcode_same_read_on_fresh_fault_session_rejects_gcode(tmp_path: Path):
+    _, _, _, proxy, _ = await _command_proxy(tmp_path)
+    try:
+        assert isinstance(proxy.serial, MockSerialEndpoint)
+        await proxy.safety.request_estop(EstopSource.WEB, "test fault")
+        reader, writer = await _open_proxy_client(proxy)
+
+        writer.write(b"M113\nG1 X10\n")
+        await writer.drain()
+        await _wait_for(lambda: b"$H\n" in proxy.serial.written)
+        await proxy.serial.inject_rx(b"<Home|FS:0,0>\n<Idle|FS:0,0>\n")
+
+        assert await _read_until_custom_response(reader) == b"ok\r\n"
+        assert await _read_until_custom_response(reader) == b"error:121\r\n"
+        assert b"G1 X10\n" not in proxy.serial.written
+
+        writer.close()
+        await writer.wait_closed()
+    finally:
+        await proxy.stop()
+
+
 async def _wait_for(predicate, timeout: float = 1.0):
     deadline = asyncio.get_running_loop().time() + timeout
     while asyncio.get_running_loop().time() < deadline:
@@ -587,6 +643,15 @@ async def _wait_for(predicate, timeout: float = 1.0):
             return
         await asyncio.sleep(0.01)
     raise AssertionError("condition was not met")
+
+
+async def _wait_for_lightburn_connected(state: ControllerState, timeout: float = 1.0) -> None:
+    deadline = asyncio.get_running_loop().time() + timeout
+    while asyncio.get_running_loop().time() < deadline:
+        if (await state.snapshot()).lightburn.connected:
+            return
+        await asyncio.sleep(0.01)
+    raise AssertionError("LightBurn did not become connected")
 
 
 async def _read_until_custom_response(reader: asyncio.StreamReader, timeout: float = 1.0) -> bytes:
